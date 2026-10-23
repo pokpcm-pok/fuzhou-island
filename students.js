@@ -3,7 +3,8 @@
   var HATS=[['','不戴'],['hat','工作帽'],['glasses','眼鏡'],['band','髮帶'],['phones','耳機'],['box','紙箱'],['beret','畫家帽'],['antenna','天線'],['grad','畢業帽'],['speech','對話框'],['pennant','小旗'],['bow','蝴蝶結'],['cap','鴨舌帽'],['camera','相機'],['prop','螺旋槳帽'],['tie','領結']];
   var FACES=[['smile','微笑'],['open','開心'],['wink','眨眼'],['sleepy','想睡']];
   var COLORS=['#FFFFFF','#FFE9D6','#FFD400','#FF9FC6','#E6007E','#00A9E0','#7FD6F2','#6FCF97','#B39DDB','#F2994A','#BDBDBD','#4A4F55'];
-  var S={list:[],me:null,token:null,draft:null,cfg:null,o:null,gisLoaded:false,pv:null};
+  var S={list:[],me:null,token:null,draft:null,cfg:null,o:null,gisLoaded:false,pv:null,seen:{},log:[]};
+  var QUICK=['👋 嗨！','請問這座島怎麼逛？','一起去吃飯嗎？','謝謝你！'];
 
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function has(list,v){return list.some(function(x){return x[0]===v;});}
@@ -98,9 +99,11 @@
 
   /* ---------- 事件 ---------- */
   function onClick(e){
+    var q=e.target.closest('[data-q]');if(q){sendChat(q.dataset.q);return;}
     var o=e.target.closest('.opt,.sw');
     if(o&&S.draft){S.draft[o.dataset.k]=o.dataset.v;
       [].forEach.call(document.querySelectorAll('[data-k="'+o.dataset.k+'"]'),function(b){b.setAttribute('aria-pressed',b===o?'true':'false');});rebuild();return;}
+    if(e.target.id==='chatSend'){var ci=document.getElementById('chatIn');sendChat(ci&&ci.value);return;}
     if(e.target.id==='stuSave')save();
     if(e.target.id==='stuDel')remove();
     if(e.target.closest('[data-act="edit"]'))show();
@@ -125,9 +128,52 @@
     api({action:'delete',token:S.token}).then(fin).catch(function(e){msg(e.message,true);});
   }
 
+  /* ---------- 公開氣泡留言 ---------- */
+  function mySid(){return S.me?(S.me.sid||'me'):null;}
+  function nickOf(sid){var s=S.list.filter(function(x){return x.sid===sid;})[0];return s?s.nickname:'';}
+  function logHTML(){
+    return S.log.slice(-8).map(function(m){return '<li><b>'+esc(m.nick)+'</b>'+esc(m.text)+'</li>';}).join('')||'<li class="empty">還沒有人說話，當第一個吧！</li>';
+  }
+  function renderLog(){var el=document.getElementById('chatLog');if(el){el.innerHTML=logHTML();el.scrollTop=el.scrollHeight;}}
+  function chatHTML(toNick){
+    var head='<h3>說說話</h3>';
+    if(live()&&!S.token)return head+'<p class="note" style="margin-top:0">登入後，就能在島上對同學說話，頭上會冒出氣泡。</p><div class="actrow"><button class="primary" data-act="edit">登入，開始聊天</button></div><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
+    if(!S.me)return head+'<p class="note" style="margin-top:0">先建立你的角色，就能開始說話。</p><div class="actrow"><button class="primary" data-act="edit">建立我的角色</button></div><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
+    return head+'<div class="chatbox"><input id="chatIn" maxlength="40" autocomplete="off" data-to="'+esc(toNick||'')+'" placeholder="'+(toNick?'對 '+esc(toNick)+' 說…':'對大家說…')+'"><button class="primary" id="chatSend">送出</button></div>'+
+      '<div class="optrow">'+QUICK.map(function(q){return '<button type="button" class="opt" data-k="q" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')+'</div>'+
+      '<p class="note" id="chatMsg" aria-live="polite" style="border:0;padding:0;margin:6px 0 0"></p><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
+  }
+  function cmsg(t,bad){var m=document.getElementById('chatMsg');if(m){m.textContent=t;m.style.color=bad?'var(--ma-t,#E6007E)':'var(--muted)';}}
+  function addLog(m,bubble){
+    if(S.seen[m.id])return;S.seen[m.id]=1;
+    S.log.push({nick:m.nick,text:m.text});if(S.log.length>40)S.log.shift();
+    if(bubble)World.say('s:'+m.sid,m.text,m.nick,9000,'stu');
+  }
+  function sendChat(text){
+    var inp=document.getElementById('chatIn');text=(text||'').trim();if(!text)return;
+    var to=inp?inp.dataset.to:'';if(to&&text.indexOf('@')!==0)text='@'+to+' '+text;
+    text=text.slice(0,40);var btn=document.getElementById('chatSend');if(btn)btn.disabled=true;
+    var done=function(m){addLog(m,true);if(inp)inp.value='';if(btn)btn.disabled=false;cmsg('');renderLog();};
+    if(!live()){done({id:'pv-'+Date.now(),sid:mySid(),nick:S.me.nickname,text:text});return;}
+    api({action:'say',token:S.token,text:text}).then(function(j){done(j.msg);})
+      .catch(function(e){if(btn)btn.disabled=false;if(/逾時|無效/.test(e.message))S.token=null;cmsg(e.message,true);});
+  }
+  function pollChat(){
+    if(!live()||document.hidden)return;
+    fetch(S.cfg.api+(S.cfg.api.indexOf('?')>-1?'&':'?')+'action=chat').then(function(r){return r.json();}).then(function(j){
+      var now=j.now||Date.now(),fresh=false;
+      (Array.isArray(j.chat)?j.chat:[]).forEach(function(m){
+        if(!m||!m.id||!m.sid||!m.text)return;
+        if(S.seen[m.id])return;
+        addLog({id:String(m.id),sid:String(m.sid),nick:String(m.nick||'').slice(0,12),text:String(m.text).slice(0,60)},now-m.t<45000);fresh=true;});
+      if(fresh)renderLog();}).catch(function(){});
+  }
+
   window.Students={
     init:function(o){S.o=o;S.cfg=o.cfg;o.detail.addEventListener('click',onClick);
-      refresh();setInterval(function(){if(!document.hidden)refresh();},90000);},
+      refresh();setInterval(function(){if(!document.hidden)refresh();},90000);
+      pollChat();setInterval(pollChat,8000);
+      o.detail.addEventListener('keydown',function(e){if(e.target.id==='chatIn'&&e.key==='Enter'){e.preventDefault();sendChat(e.target.value);}});},
     open:show,
     html:function(id){
       var sid=id.slice(2),s=S.list.filter(function(x){return x.sid===sid;})[0];if(!s)return '';
@@ -135,7 +181,7 @@
       var mineBtn=(S.me&&S.me.sid===s.sid)||(!live()&&s.sid==='me')?'<div class="actrow"><button class="primary" data-act="edit">編輯我的角色</button></div>':'';
       return '<button class="back" data-act="back">← 回到總覽</button><div style="margin-top:12px"><span class="kind" style="--t:'+esc(s.body_color)+'">同學</span></div>'+
         '<h2>'+esc(s.nickname)+'</h2><p>'+(s.bio?esc(s.bio):'這位同學還沒有寫自我介紹。')+'</p>'+
-        '<h3>住在</h3><div class="tags"><button data-go="'+esc(s.island_id)+'"><i></i>'+esc(isl?isl.name:'')+'</button></div>'+mineBtn;
+        '<h3>住在</h3><div class="tags"><button data-go="'+esc(s.island_id)+'"><i></i>'+esc(isl?isl.name:'')+'</button></div>'+mineBtn+chatHTML(mySid()&&s.sid===mySid()?'':s.nickname);
     }
   };
 })();
