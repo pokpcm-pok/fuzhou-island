@@ -79,7 +79,7 @@
   };
 
 
-  /* ---------- 偶爾路過的訪客：神明、飛機 ---------- */
+  /* ---------- 偶爾路過的訪客：土地公（手持甘蔗）、飛機 ---------- */
   function bm(c,o){return new T.MeshBasicMaterial(Object.assign({color:c,fog:false},o||{}));}
   function bmesh(geo,c,x,y,z,o){var m=new T.Mesh(geo,bm(c,o));m.position.set(x||0,y||0,z||0);return m;}
   function makeDeity(){
@@ -88,20 +88,33 @@
     [[0,-1.5,0,2.0],[-1.5,-1.3,.2,1.4],[1.5,-1.3,-.1,1.5],[.6,-1.1,.6,1.2],[-.7,-1.1,-.6,1.2]].forEach(function(c){
       var s=bmesh(new T.SphereGeometry(c[3]*.62,12,8),0xFFF3C0,c[0],c[1],c[2]);s.scale.y=.6;body.add(s);});
     // 衣袍、金邊、腰帶
-    body.add(bmesh(new T.CylinderGeometry(.55,1.05,2.0,14),0xD7262E,0,.1,0));
-    body.add(bmesh(new T.CylinderGeometry(1.07,1.07,.16,14),0xFFD400,0,-.86,0));
-    body.add(bmesh(new T.CylinderGeometry(.58,.58,.2,14),0xFFD400,0,.55,0));
+    body.add(bmesh(new T.CylinderGeometry(.55,1.05,2.0,14),0xE8A317,0,.1,0));
+    body.add(bmesh(new T.CylinderGeometry(1.07,1.07,.16,14),0xB5121B,0,-.86,0));
+    body.add(bmesh(new T.CylinderGeometry(.58,.58,.2,14),0xB5121B,0,.55,0));
     // 寬袖與雙手
     [-1,1].forEach(function(sd){
-      var sl=bmesh(new T.SphereGeometry(.5,12,8),0xB81E26,sd*.95,.45,.35);sl.scale.set(.8,1.2,.8);sl.rotation.z=sd*.5;body.add(sl);
+      var sl=bmesh(new T.SphereGeometry(.5,12,8),0xC98A0E,sd*.95,.45,.35);sl.scale.set(.8,1.2,.8);sl.rotation.z=sd*.5;body.add(sl);
       body.add(bmesh(new T.SphereGeometry(.16,10,8),0xF3C9A5,sd*.8,-.15,.5));
     });
     // 頭、白鬍、眉、眼、腮紅
     body.add(bmesh(new T.SphereGeometry(.52,16,12),0xF3C9A5,0,1.55,0));
-    var bd=bmesh(new T.ConeGeometry(.42,1.0,10),0xFFFFFF,0,1.05,.38);bd.rotation.x=Math.PI;bd.scale.z=.5;body.add(bd);
+    var bd=bmesh(new T.ConeGeometry(.5,1.35,12),0xFFFFFF,0,.95,.38);bd.rotation.x=Math.PI;bd.scale.z=.5;body.add(bd);
     body.add(bmesh(new T.SphereGeometry(.06,8,6),0x23282D,-.2,1.62,.46),bmesh(new T.SphereGeometry(.06,8,6),0x23282D,.2,1.62,.46));
     var b1=bmesh(new T.BoxGeometry(.28,.06,.06),0xFFFFFF,-.2,1.76,.47),b2=bmesh(new T.BoxGeometry(.28,.06,.06),0xFFFFFF,.2,1.76,.47);b1.rotation.z=.25;b2.rotation.z=-.25;body.add(b1,b2);
     body.add(bmesh(new T.SphereGeometry(.09,8,6),0xFF9FC6,-.33,1.48,.42),bmesh(new T.SphereGeometry(.09,8,6),0xFF9FC6,.33,1.48,.42));
+    // 笑臉：微笑的弧線
+    var sm=bmesh(new T.TorusGeometry(.17,.035,6,14,Math.PI),0x8A3B2B,0,1.42,.5);sm.rotation.z=Math.PI;body.add(sm);
+    // 甘蔗：紫皮蔗節、淺色節環、頂端綠葉，右手緊握
+    var cane=new T.Group();
+    for(i=0;i<7;i++){
+      cane.add(bmesh(new T.CylinderGeometry(.11,.12,.52,8),i%2?0x4B2E83:0x5B3A99,0,-.9+i*.52+.26,0));
+      cane.add(bmesh(new T.CylinderGeometry(.15,.15,.06,8),0xD9C7F0,0,-.9+(i+1)*.52,0));
+    }
+    for(i=0;i<5;i++){
+      var lf=bmesh(new T.ConeGeometry(.07,1.5,5),0x3FA34D,0,3.05,0);lf.geometry.translate(0,.75,0);
+      lf.rotation.z=(i-2)*.38;lf.rotation.y=i*1.26;cane.add(lf);
+    }
+    cane.position.set(.88,-.1,.62);cane.rotation.z=-.08;body.add(cane);
     // 官帽
     body.add(bmesh(new T.CylinderGeometry(.38,.46,.42,12),0x23282D,0,2.05,0));
     body.add(bmesh(new T.BoxGeometry(1.35,.07,.26),0x23282D,0,2.12,-.05),bmesh(new T.BoxGeometry(1.35,.02,.1),0xFFD400,0,2.17,-.05));
@@ -213,5 +226,6 @@
     updateVisitors(dt,t,cam,reduce);
     st.rings.forEach(function(r){var s=1+((t*.35+r.ph)%1)*.14;r.m.scale.setScalar(s);r.m.material.opacity=.55*(1-((t*.35+r.ph)%1));});
   };
+  O.makeDeity=makeDeity;
   window.Ocean=O;
 })();
