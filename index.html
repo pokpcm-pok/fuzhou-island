@@ -67,7 +67,11 @@ h1 span{color:var(--accent)}
 .chatlog{list-style:none;margin:10px 0 0;padding:8px 10px;max-height:150px;overflow:auto;border:2px dashed var(--border);border-radius:12px;font-size:13px}
 .chatlog li{padding:2px 0}.chatlog b{color:var(--muted);margin-right:6px;font-weight:700}.chatlog .empty{color:var(--muted)}
 .say b{display:block;font-size:11px;color:#E6007E;margin-bottom:1px}
-.say.npc{background:#FFF6C9}.say.stu{background:#E9F8FF}
+.say.npc{background:#FFF6C9}
+.say.boss{background:#FFD6E8;border-color:#E6007E;max-width:240px}
+.bosschk{display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0;color:var(--fg)}
+#bossBanner{display:none;position:absolute;left:12px;right:12px;top:56px;z-index:8;pointer-events:none;background:#FFD6E8;color:#1E2328;border:2px solid #E6007E;border-radius:14px;padding:8px 14px;font-size:14px;line-height:1.5;box-shadow:0 2px 0 #1E2328;animation:sayIn .2s ease-out}
+#bossBanner b{color:#B5004F;margin-right:4px}.say.stu{background:#E9F8FF}
 @keyframes sayIn{from{opacity:0;margin-top:6px}to{opacity:1;margin-top:0}}
 @media (prefers-reduced-motion:reduce){.say{animation:none}}
 .tag.dim{opacity:.35}

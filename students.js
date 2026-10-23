@@ -3,7 +3,7 @@
   var HATS=[['','不戴'],['hat','工作帽'],['glasses','眼鏡'],['band','髮帶'],['phones','耳機'],['box','紙箱'],['beret','畫家帽'],['antenna','天線'],['grad','畢業帽'],['speech','對話框'],['pennant','小旗'],['bow','蝴蝶結'],['cap','鴨舌帽'],['camera','相機'],['prop','螺旋槳帽'],['tie','領結']];
   var FACES=[['smile','微笑'],['open','開心'],['wink','眨眼'],['sleepy','想睡']];
   var COLORS=['#FFFFFF','#FFE9D6','#FFD400','#FF9FC6','#E6007E','#00A9E0','#7FD6F2','#6FCF97','#B39DDB','#F2994A','#BDBDBD','#4A4F55'];
-  var S={list:[],me:null,token:null,draft:null,cfg:null,o:null,gisLoaded:false,pv:null,seen:{},log:[]};
+  var S={list:[],me:null,token:null,draft:null,cfg:null,o:null,gisLoaded:false,pv:null,seen:{},log:[],admin:false};
   var QUICK=['👋 嗨！','請問這座島怎麼逛？','一起去吃飯嗎？','謝謝你！'];
 
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -93,7 +93,7 @@
   }
   function onCred(res){
     S.token=res.credential;msg('登入成功，讀取你的角色…');
-    api({action:'me',token:S.token}).then(function(j){S.me=j.me;S.draft=null;show();})
+    api({action:'me',token:S.token}).then(function(j){S.me=j.me;S.admin=!!j.admin;S.draft=null;show();})
       .catch(function(e){S.token=null;msg(e.message,true);});
   }
 
@@ -103,6 +103,7 @@
     var o=e.target.closest('.opt,.sw');
     if(o&&S.draft){S.draft[o.dataset.k]=o.dataset.v;
       [].forEach.call(document.querySelectorAll('[data-k="'+o.dataset.k+'"]'),function(b){b.setAttribute('aria-pressed',b===o?'true':'false');});rebuild();return;}
+    if(e.target.id==='chatBoss'){var ci0=document.getElementById('chatIn');if(ci0)ci0.maxLength=e.target.checked?60:40;return;}
     if(e.target.id==='chatSend'){var ci=document.getElementById('chatIn');sendChat(ci&&ci.value);return;}
     if(e.target.id==='stuSave')save();
     if(e.target.id==='stuDel')remove();
@@ -138,24 +139,37 @@
   function chatHTML(toNick){
     var head='<h3>說說話</h3>';
     if(live()&&!S.token)return head+'<p class="note" style="margin-top:0">登入後，就能在島上對同學說話，頭上會冒出氣泡。</p><div class="actrow"><button class="primary" data-act="edit">登入，開始聊天</button></div><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
-    if(!S.me)return head+'<p class="note" style="margin-top:0">先建立你的角色，就能開始說話。</p><div class="actrow"><button class="primary" data-act="edit">建立我的角色</button></div><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
-    return head+'<div class="chatbox"><input id="chatIn" maxlength="40" autocomplete="off" data-to="'+esc(toNick||'')+'" placeholder="'+(toNick?'對 '+esc(toNick)+' 說…':'對大家說…')+'"><button class="primary" id="chatSend">送出</button></div>'+
+    if(!S.me&&!S.admin)return head+'<p class="note" style="margin-top:0">先建立你的角色，就能開始說話。</p><div class="actrow"><button class="primary" data-act="edit">建立我的角色</button></div><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
+    var bossBox=S.admin?'<label class="bosschk"><input type="checkbox" id="chatBoss"> 以 BOSS 身分說話（公告：全站頂端會顯示 25 秒）</label>':'';
+    return head+bossBox+'<div class="chatbox"><input id="chatIn" maxlength="40" autocomplete="off" data-to="'+esc(toNick||'')+'" placeholder="'+(toNick?'對 '+esc(toNick)+' 說…':'對大家說…')+'"><button class="primary" id="chatSend">送出</button></div>'+
       '<div class="optrow">'+QUICK.map(function(q){return '<button type="button" class="opt" data-k="q" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')+'</div>'+
       '<p class="note" id="chatMsg" aria-live="polite" style="border:0;padding:0;margin:6px 0 0"></p><ul class="chatlog" id="chatLog">'+logHTML()+'</ul>';
   }
   function cmsg(t,bad){var m=document.getElementById('chatMsg');if(m){m.textContent=t;m.style.color=bad?'var(--ma-t,#E6007E)':'var(--muted)';}}
+  var bnTimer=null;
+  function banner(text){
+    var st=document.getElementById('stage');if(!st)return;
+    var el=document.getElementById('bossBanner');
+    if(!el){el=document.createElement('div');el.id='bossBanner';el.setAttribute('role','status');st.appendChild(el);}
+    el.textContent='';var b=document.createElement('b');b.textContent='📣 波客老師';el.appendChild(b);el.appendChild(document.createTextNode(' '+text));
+    el.style.display='block';clearTimeout(bnTimer);bnTimer=setTimeout(function(){el.style.display='none';},25000);
+  }
   function addLog(m,bubble){
     if(S.seen[m.id])return;S.seen[m.id]=1;
     S.log.push({nick:m.nick,text:m.text});if(S.log.length>40)S.log.shift();
-    if(bubble)World.say('s:'+m.sid,m.text,m.nick,9000,'stu');
+    if(bubble){
+      if(m.boss||m.sid==='boss'){World.say('boss',m.text,'波客老師・公告',25000,'npc boss');banner(m.text);}
+      else World.say('s:'+m.sid,m.text,m.nick,9000,'stu');
+    }
   }
   function sendChat(text){
     var inp=document.getElementById('chatIn');text=(text||'').trim();if(!text)return;
-    var to=inp?inp.dataset.to:'';if(to&&text.indexOf('@')!==0)text='@'+to+' '+text;
-    text=text.slice(0,40);var btn=document.getElementById('chatSend');if(btn)btn.disabled=true;
+    var bc=document.getElementById('chatBoss'),asBoss=!!(S.admin&&bc&&bc.checked);
+    var to=inp?inp.dataset.to:'';if(!asBoss&&to&&text.indexOf('@')!==0)text='@'+to+' '+text;
+    text=text.slice(0,asBoss?60:40);var btn=document.getElementById('chatSend');if(btn)btn.disabled=true;
     var done=function(m){addLog(m,true);if(inp)inp.value='';if(btn)btn.disabled=false;cmsg('');renderLog();};
     if(!live()){done({id:'pv-'+Date.now(),sid:mySid(),nick:S.me.nickname,text:text});return;}
-    api({action:'say',token:S.token,text:text}).then(function(j){done(j.msg);})
+    api({action:'say',token:S.token,text:text,as:asBoss?'boss':undefined}).then(function(j){done(j.msg);})
       .catch(function(e){if(btn)btn.disabled=false;if(/逾時|無效/.test(e.message))S.token=null;cmsg(e.message,true);});
   }
   function pollChat(){
@@ -165,7 +179,7 @@
       (Array.isArray(j.chat)?j.chat:[]).forEach(function(m){
         if(!m||!m.id||!m.sid||!m.text)return;
         if(S.seen[m.id])return;
-        addLog({id:String(m.id),sid:String(m.sid),nick:String(m.nick||'').slice(0,12),text:String(m.text).slice(0,60)},now-m.t<45000);fresh=true;});
+        addLog({id:String(m.id),sid:String(m.sid),nick:String(m.nick||'').slice(0,12),text:String(m.text).slice(0,60),boss:!!m.boss},now-m.t<(m.boss?60000:45000));fresh=true;});
       if(fresh)renderLog();}).catch(function(){});
   }
 
