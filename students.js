@@ -67,9 +67,16 @@
       '<p class="note" id="stuMsg" aria-live="polite" style="border:0;padding:0;margin-top:8px"></p>';
   }
   function msg(t,bad){var m=document.getElementById('stuMsg');if(m){m.textContent=t;m.style.color=bad?'var(--ma-t,#E6007E)':'var(--muted)';}}
+  /* LINE、Facebook、Instagram 等 App 內建瀏覽器會被 Google 擋下登入，先提醒改用 Safari 或 Chrome */
+  function inApp(){return /\bLine\/|FBAN|FBAV|FB_IAB|Instagram|Messenger|MicroMessenger|Twitter|KAKAOTALK|Snapchat|GSA\//i.test(navigator.userAgent||'');}
+  function inAppWarn(){
+    if(!inApp())return '';
+    return '<div class="note" style="border:2px solid #E6007E;border-radius:12px;padding:10px 12px;margin:10px 0;background:#FFF0F7;color:#1E2328"><b>你正在 App 內建瀏覽器中</b><br>Google 不允許在這裡登入。請點右上或右下角的「⋯」選「用 Safari／Chrome 開啟」，或複製網址貼到瀏覽器。'+
+      '<div class="actrow" style="margin-top:8px"><button class="primary" data-act="copyurl">複製網址</button></div></div>';
+  }
   function loginHTML(){
     return '<button class="back" data-act="back">← 回到總覽</button><h2 style="margin-top:12px">登入，建立我的角色</h2>'+
-      '<p>用任何 Gmail 帳號登入，設計一個專屬的小人，住進喜歡的島。每個帳號一個角色，之後隨時可以修改。</p>'+
+      '<p>用任何 Gmail 帳號登入，設計一個專屬的小人，住進喜歡的島。每個帳號一個角色，之後隨時可以修改。</p>'+inAppWarn()+
       '<div id="gbtn" style="min-height:44px"></div><p class="note" id="stuMsg" aria-live="polite">我們只取得你的信箱來辨識身分，公開畫面只顯示暱稱與外觀，不會公開信箱。</p>';
   }
   function show(){
@@ -103,6 +110,13 @@
     var o=e.target.closest('.opt,.sw');
     if(o&&S.draft){S.draft[o.dataset.k]=o.dataset.v;
       [].forEach.call(document.querySelectorAll('[data-k="'+o.dataset.k+'"]'),function(b){b.setAttribute('aria-pressed',b===o?'true':'false');});rebuild();return;}
+    if(e.target.closest('[data-act="copyurl"]')){
+      var url=location.href.split('#')[0],btn=e.target.closest('[data-act="copyurl"]');
+      var ok=function(){btn.textContent='已複製，請到瀏覽器貼上';};
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(ok,function(){prompt('請長按複製網址',url);});
+      else{prompt('請長按複製網址',url);}
+      return;
+    }
     if(e.target.id==='chatBoss'){var ci0=document.getElementById('chatIn');if(ci0)ci0.maxLength=e.target.checked?60:40;return;}
     if(e.target.id==='chatSend'){var ci=document.getElementById('chatIn');sendChat(ci&&ci.value);return;}
     if(e.target.id==='stuSave')save();
