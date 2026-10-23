@@ -179,7 +179,7 @@
       st.ring.position.set(o.d.x,.25,o.d.z);st.ring.visible=true;
       st.bridges.forEach(function(b){if(b.a.id===id||b.b.id===id)b.rail.color.setHex(0xE6007E);});
     }
-    if(id&&walk!==false)W.walkTo(id);
+    if(id&&walk!==false&&!(st.selfSid&&id==='s:'+st.selfSid))W.walkTo(id);
     st.onSelect(id);
   };
   /* ---------- 同學角色 ---------- */
@@ -188,20 +188,68 @@
       if(bad.some(function(b){return Math.hypot(x-b[0],z-b[1])<b[2];}))continue;
       if(out.some(function(p){return Math.hypot(x-p[0],z-p[1])<1.35;}))continue;out.push([x,z]);}
     return out;})();
+  function disposeObj(g){g.traverse(function(m){if(m.geometry)m.geometry.dispose();if(m.material)m.material.dispose();});}
   W.setStudents=function(list){
     if(!st.stuNodes)st.stuNodes=[];st.stuIsland={};
-    st.stuNodes.forEach(function(n){n.o.float.remove(n.g);n.g.traverse(function(m){if(m.geometry)m.geometry.dispose();if(m.material)m.material.dispose();});if(n.tag.parentNode)n.tag.parentNode.removeChild(n.tag);});
+    var old={};
+    st.stuNodes.forEach(function(n){old[n.sid]={x:n.x,z:n.z,tx:n.tx,tz:n.tz,tr:n.tr,live:n.live};st.scene.remove(n.g);disposeObj(n.g);if(n.tag.parentNode)n.tag.parentNode.removeChild(n.tag);});
     st.stuNodes=[];var cnt={},over={};
     (list||[]).forEach(function(s,idx){
-      var o=st.byId[s.island_id];if(!o)return;var k=cnt[s.island_id]=(cnt[s.island_id]||0);
+      var o=st.byId[s.island_id];if(!o)return;var id='s:'+s.sid;
+      st.stuIsland[id]=s.island_id;
+      if(st.selfSid&&s.sid===st.selfSid)return; // 自己是可操控的主角，不重複放一個
+      var k=cnt[s.island_id]=(cnt[s.island_id]||0);
       if(k>=SLOTS.length){over[s.island_id]=(over[s.island_id]||0)+1;return;}cnt[s.island_id]++;
       var col=parseInt(String(s.body_color).replace('#',''),16);if(isNaN(col))col=0xFFFFFF;
-      var g=Props.char(s.hat||'',1.0,col,s.face);g.position.set(SLOTS[k][0],0,SLOTS[k][1]);g.rotation.y=Math.atan2(-SLOTS[k][0],-SLOTS[k][1])+((idx%5)-2)*.12;
-      var id='s:'+s.sid;g.traverse(function(m){m.userData.id=id;});o.float.add(g);
+      var hx=o.d.x+SLOTS[k][0],hz=o.d.z+SLOTS[k][1],ry=Math.atan2(-SLOTS[k][0],-SLOTS[k][1])+((idx%5)-2)*.12;
+      var g=Props.char(s.hat||'',1.0,col,s.face);g.rotation.y=ry;g.position.set(hx,0,hz);
+      g.traverse(function(m){m.userData.id=id;});st.scene.add(g);
       var tag=document.createElement('button');tag.className='tag stu';tag.textContent=s.nickname;tag.dataset.id=id;st.labels.appendChild(tag);
-      st.stuIsland[id]=s.island_id;st.stuNodes.push({g:g,o:o,tag:tag,x:o.d.x+SLOTS[k][0],z:o.d.z+SLOTS[k][1],ph:idx*.7,id:id});
+      var n={g:g,o:o,tag:tag,sid:s.sid,hx:hx,hz:hz,x:hx,z:hz,tx:hx,tz:hz,tr:ry,ry:ry,live:false,moving:false,ph:idx*.7,id:id},od=old[s.sid];
+      if(od&&od.live){n.x=od.x;n.z=od.z;n.tx=od.tx;n.tz=od.tz;n.tr=od.tr;n.live=true;}
+      st.stuNodes.push(n);
     });
     st.stuOver=over;
+  };
+  /* 即時位置：pos = {sid:{x,z,r,t}}，now = 伺服器時間。超過 20 秒沒更新的視為離線，回到住處 */
+  W.setPresence=function(pos,now){
+    pos=pos||{};
+    (st.stuNodes||[]).forEach(function(n){
+      var p=pos[n.sid],fresh=p&&isFinite(p.x)&&isFinite(p.z)&&now-p.t<20000;
+      if(fresh){if(!n.live){n.x=p.x;n.z=p.z;}n.live=true;n.tx=p.x;n.tz=p.z;n.tr=p.r||0;}
+      else n.live=false;
+    });
+  };
+  W.getPos=function(){return {x:st.player.position.x,z:st.player.position.z,r:st.faceY};};
+  function turn(cur,to,k){var d=to-cur;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return cur+d*Math.min(1,k);}
+  function updateStu(n,dt,t){
+    if(n.live){
+      var dx=n.tx-n.x,dz=n.tz-n.z,d=Math.sqrt(dx*dx+dz*dz);
+      if(d>.04){var k=Math.min(1,dt*5);n.x+=dx*k;n.z+=dz*k;}
+      n.moving=d>.35;
+      n.ry=turn(n.ry,n.moving?Math.atan2(dx,dz):n.tr,dt*8);
+      n.g.rotation.y=n.ry;n.g.position.set(n.x,0,n.z);
+    }else{n.moving=false;n.x=n.hx;n.z=n.hz;n.g.position.set(n.hx,n.o.float.position.y,n.hz);}
+    if(!st.reduce&&!st.saver)n.g.userData.body.position.y=n.moving?Math.abs(Math.sin(t*12))*.2:Math.abs(Math.sin(t*2.4+n.ph))*.1;
+  }
+  /* 主角：登入並建立角色後，自己的角色取代小滴；沒有角色的訪客仍是小滴 */
+  W.setAvatar=function(prof,spawn){
+    var old=st.player,pos=old.position.clone(),p;
+    st.scene.remove(old);disposeObj(old);
+    if(prof){
+      var col=parseInt(String(prof.body_color).replace('#',''),16);if(isNaN(col))col=0xFFFFFF;
+      st.selfSid=prof.sid||'me';
+      p=Props.char(prof.hat||'',1.1,col,prof.face);var sid='s:'+st.selfSid;
+      p.traverse(function(m){m.userData.id=sid;});
+      st.stuIsland[sid]=prof.island_id;
+      if(!st.selfTag){var tg=document.createElement('button');tg.className='tag stu me';st.labels.appendChild(tg);st.selfTag=tg;}
+      st.selfTag.textContent=prof.nickname+'（我）';st.selfTag.dataset.id=sid;st.selfTag.style.display='';
+      var isl=st.byId[prof.island_id];if(spawn&&isl)pos.set(isl.d.x+3.2,0,isl.d.z+3.4);
+    }else{
+      st.selfSid=null;p=Props.drop();p.traverse(function(m){m.userData.me=true;});
+      if(st.selfTag)st.selfTag.style.display='none';
+    }
+    p.position.copy(pos);p.rotation.y=st.faceY||0;st.scene.add(p);st.player=p;st.pg=p.userData.body;st.path=[];
   };
   W.focusStudent=function(sid){W.select('s:'+sid,true);};
   W.clear=function(){W.select(null,false);};
@@ -216,7 +264,8 @@
     if(key==='me'){var p=st.player.position;return [p.x,3.3,p.z];}
     if(key==='boss'){var cb=st.byId.courses;return [cb.d.x-2.6,6.3+cb.float.position.y,cb.d.z+2.4];}
     if(key.indexOf('res:')===0){o=st.byId[key.slice(4)];return o?[o.d.x+2.6,o.float.position.y+3.9,o.d.z+1.9]:null;}
-    for(i=0;i<(st.stuNodes||[]).length;i++){n=st.stuNodes[i];if(n.id===key)return [n.x,n.o.float.position.y+3.6,n.z];}
+    if(st.selfSid&&key==='s:'+st.selfSid){var q=st.player.position;return [q.x,3.7,q.z];}
+    for(i=0;i<(st.stuNodes||[]).length;i++){n=st.stuNodes[i];if(n.id===key)return [n.x,(n.live?0:n.o.float.position.y)+3.6,n.z];}
     return null;
   }
   function islandOf(key){
@@ -309,8 +358,8 @@
         var sp=o.lm.userData.spin;if(sp)sp.rotation.y+=dt*1.2;
       });
       st.boss.userData.body.position.y=Math.abs(Math.sin(t*2.6))*.15;
-      (st.stuNodes||[]).forEach(function(n){n.g.userData.body.position.y=Math.abs(Math.sin(t*2.4+n.ph))*.1;});
     }
+    (st.stuNodes||[]).forEach(function(n){updateStu(n,dt,t);});
     // camera
     var c=st.cam;
     if(st.over){c.want.set(CX,0,CZ);}else{c.want.set(pp.x,0,pp.z);}
@@ -333,7 +382,8 @@
     st.islands.forEach(function(o){put(o.tag,o.d.x,o.float.position.y+5.2,o.d.z);o.tag.classList.toggle('sel',st.sel===o.d.id);});
     (st.stuNodes||[]).forEach(function(n){
       var dx=n.x-st.cam.tgt.x,dz=n.z-st.cam.tgt.z,near=!st.over&&dx*dx+dz*dz<26*26||st.sel===n.id;
-      if(!near){n.tag.style.display='none';return;}put(n.tag,n.x,n.o.float.position.y+2.5,n.z);n.tag.classList.toggle('sel',st.sel===n.id);});
+      if(!near){n.tag.style.display='none';return;}put(n.tag,n.x,(n.live?0:n.o.float.position.y)+2.5,n.z);n.tag.classList.toggle('sel',st.sel===n.id);});
+    if(st.selfTag&&st.selfSid){put(st.selfTag,st.player.position.x,3.0,st.player.position.z);st.selfTag.classList.toggle('sel',st.sel==='s:'+st.selfSid);}
     placeBubbles(put);
     var cb=st.byId.courses.d;put(st.bossTag,cb.x-2.6,5.4,cb.z+2.4);st.bossTag.classList.toggle('sel',st.sel==='boss');
   }

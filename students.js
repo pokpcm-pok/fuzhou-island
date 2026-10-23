@@ -31,6 +31,30 @@
     if(i>-1)S.list[i]=mine;else S.list.push(mine);
   }
 
+  /* ---------- 主角與即時位置 ---------- */
+  function avatar(spawn){
+    if(S.me)World.setAvatar(Object.assign({},S.me,{sid:S.me.sid||'me'}),spawn);else World.setAvatar(null);
+  }
+  function url(q){return S.cfg.api+(S.cfg.api.indexOf('?')>-1?'&':'?')+q;}
+  function applyPos(j){if(j&&j.pos)World.setPresence(j.pos,j.now||Date.now());}
+  function syncLoop(){
+    var wait=3000;
+    if(!live()){return;}
+    if(!document.hidden){
+      var p=World.getPos(),moved=!S.lp||Math.abs(p.x-S.lp.x)+Math.abs(p.z-S.lp.z)>.05;
+      if(moved){S.lp={x:p.x,z:p.z};S.lm=Date.now();}
+      var idle=S.lm&&Date.now()-S.lm>30000;if(idle)wait=8000;
+      if(S.sess&&S.me){
+        api({action:'sync',sess:S.sess,x:Math.round(p.x*10)/10,z:Math.round(p.z*10)/10,r:Math.round(p.r*100)/100}).then(applyPos)
+          .catch(function(e){if(/逾時|無效|請重新/.test(e.message))S.sess=null;});
+      }else{
+        wait=5000;
+        fetch(url('action=pos')).then(function(r){return r.json();}).then(applyPos).catch(function(){});
+      }
+    }else wait=8000;
+    setTimeout(syncLoop,wait);
+  }
+
   /* ---------- 預覽 ---------- */
   function startPreview(){
     var host=document.getElementById('pv');if(!host||!window.THREE)return;
@@ -100,7 +124,7 @@
   }
   function onCred(res){
     S.token=res.credential;msg('登入成功，讀取你的角色…');
-    api({action:'me',token:S.token}).then(function(j){S.me=j.me;S.admin=!!j.admin;S.draft=null;show();})
+    api({action:'me',token:S.token}).then(function(j){S.me=j.me;S.sess=j.sess||null;S.admin=!!j.admin;S.draft=null;S.hadAvatar=!!S.me;if(S.me)merge(S.me);avatar(true);World.setStudents(S.list);show();})
       .catch(function(e){S.token=null;msg(e.message,true);});
   }
 
@@ -131,14 +155,14 @@
   function save(){
     readDraft();if(!S.draft.nickname){msg('請先輸入暱稱',true);return;}
     var b=document.getElementById('stuSave');b.disabled=true;msg('儲存中…');
-    var done=function(me){S.me=me;merge(me);World.setStudents(S.list);World.select('s:'+(me.sid||'me'),true);};
+    var done=function(me,sess){var first=!S.hadAvatar;S.me=me;if(sess)S.sess=sess;merge(me);avatar(first);S.hadAvatar=true;World.setStudents(S.list);World.select('s:'+(me.sid||'me'),true);};
     if(!live()){done(Object.assign({sid:'me'},S.draft));return;}
-    api({action:'save',token:S.token,profile:S.draft}).then(function(j){done(j.me);})
+    api({action:'save',token:S.token,profile:S.draft}).then(function(j){done(j.me,j.sess);})
       .catch(function(e){b.disabled=false;if(/逾時|無效/.test(e.message)){S.token=null;}msg(e.message,true);});
   }
   function remove(){
     if(!confirm('確定移除你的角色嗎？'))return;
-    var fin=function(){S.list=S.list.filter(function(s){return s.sid!==(S.me&&S.me.sid||'me');});S.me=null;S.draft=null;World.setStudents(S.list);show();};
+    var fin=function(){S.list=S.list.filter(function(s){return s.sid!==(S.me&&S.me.sid||'me');});S.me=null;S.sess=null;S.hadAvatar=false;S.draft=null;avatar(false);World.setStudents(S.list);show();};
     if(!live()){fin();return;}
     api({action:'delete',token:S.token}).then(fin).catch(function(e){msg(e.message,true);});
   }
@@ -200,7 +224,7 @@
   window.Students={
     init:function(o){S.o=o;S.cfg=o.cfg;o.detail.addEventListener('click',onClick);
       refresh();setInterval(function(){if(!document.hidden)refresh();},90000);
-      pollChat();setInterval(pollChat,8000);
+      pollChat();setInterval(pollChat,8000);setTimeout(syncLoop,1500);
       o.detail.addEventListener('keydown',function(e){if(e.target.id==='chatIn'&&e.key==='Enter'){e.preventDefault();sendChat(e.target.value);}});},
     open:show,
     html:function(id){
