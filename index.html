@@ -157,7 +157,7 @@ h1 span{color:var(--accent)}
     <div class="stage" id="stage">
       <div id="gl"></div>
       <div id="labels"></div>
-      <div class="hud"><button id="bOver">總覽</button><button id="bFollow">跟著小滴</button><button id="bMe">我的角色</button></div>
+      <div class="hud"><button id="bOver">總覽</button><button id="bFollow">跟著小滴</button><button id="bSave" aria-pressed="false" title="降低畫質與動畫，節省電力與發熱">省電：關</button><button id="bMe">我的角色</button></div>
       <div class="hint">WASD／方向鍵走動 · 拖曳旋轉 · 滾輪縮放 · 點島嶼自動前往 · 點居民、BOSS、小滴聊聊天</div>
       <div class="joy" id="joy" aria-label="虛擬搖桿"><i id="knob"></i></div>
       <div class="cmyk" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -252,6 +252,19 @@ function boot(DATA){
     [].forEach.call(document.querySelectorAll('.chip'),function(c){c.setAttribute('aria-pressed',c===b?'true':'false');});applyFilter();});
   $('#bOver').addEventListener('click',function(){World.overview();});
   $('#bFollow').addEventListener('click',function(){World.follow();});
+  // 省電模式：記住選擇；沒選過時，電量低、系統開啟省流量或偏好減少動態就自動開啟
+  (function(){
+    var bs=$('#bSave'),KEY='fz_saver';
+    function get(){try{return localStorage.getItem(KEY);}catch(e){return null;}}
+    function put(v){try{localStorage.setItem(KEY,v);}catch(e){}}
+    function apply(on){bs.setAttribute('aria-pressed',on?'true':'false');bs.textContent=on?'省電：開':'省電：關';if(ok)World.setSaver(on);}
+    bs.addEventListener('click',function(){var on=bs.getAttribute('aria-pressed')!=='true';put(on?'1':'0');apply(on);});
+    var saved=get();
+    if(saved==='1'||saved==='0'){apply(saved==='1');return;}
+    var c=navigator.connection||{};
+    if(c.saveData||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)){apply(true);return;}
+    if(navigator.getBattery)navigator.getBattery().then(function(b){if(!b.charging&&b.level<=.2&&get()===null)apply(true);}).catch(function(){});
+  })();
 
   // theme follow
   function theme(){if(ok)World.setTheme(isDark()?'dark':'light');}

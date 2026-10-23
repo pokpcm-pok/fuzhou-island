@@ -280,18 +280,29 @@
     st.camera.aspect=w/h;st.camera.updateProjectionMatrix();
   };
 
+  /* ---------- 省電模式：降解析度、關陰影、限制 30 fps、減少動畫 ---------- */
+  W.setSaver=function(on){
+    on=!!on;if(st.saver===on||!st.renderer)return;st.saver=on;
+    st.renderer.setPixelRatio(on?1:Math.min(window.devicePixelRatio||1,2));
+    st.renderer.shadowMap.enabled=!on;st.sun.castShadow=!on;
+    st.scene.traverse(function(m){if(m.material){(Array.isArray(m.material)?m.material:[m.material]).forEach(function(x){x.needsUpdate=true;});}});
+    W.resize();
+  };
+  W.saver=function(){return !!st.saver;};
+
   /* ---------- loop ---------- */
   var tmp=new T.Vector3();
   function loop(){
     requestAnimationFrame(loop);
     if(document.hidden)return;
+    if(st.saver){var nw=performance.now();if(nw-(st.lastR||0)<32)return;st.lastR=nw;}
     var dt=Math.min(.05,st.clock.getDelta()),t=st.clock.elapsedTime;
     movePlayer(dt);
     var pp=st.player.position;
     // animate
     st.pg.position.y=st.walking?Math.abs(Math.sin(t*12))*.25:Math.sin(t*2)*.04;
     st.pg.rotation.z=st.walking?Math.sin(t*12)*.08:0;
-    if(!st.reduce){
+    if(!st.reduce&&!st.saver){
       st.islands.forEach(function(o){
         o.float.position.y=Math.sin(t*.9+o.phase)*.12;
         o.char.userData.body.position.y=Math.abs(Math.sin(t*2.2+o.phase))*.12;
@@ -308,7 +319,8 @@
     st.camera.position.set(c.tgt.x+Math.sin(c.yaw)*cp*c.dist,c.tgt.y+Math.sin(c.pitch)*c.dist,c.tgt.z+Math.cos(c.yaw)*cp*c.dist);
     st.camera.lookAt(c.tgt.x,c.tgt.y+2.2,c.tgt.z);
     st.ring.scale.setScalar(1+Math.sin(t*3)*.02);
-    Ocean.update(dt,t,st.camera,st.reduce);
+    st.odt=(st.odt||0)+dt;st.fr=(st.fr||0)+1;
+    if(!st.saver||st.fr%2===0){Ocean.update(st.odt,t,st.camera,st.reduce||st.saver);st.odt=0;}
     st.renderer.render(st.scene,st.camera);
     placeLabels();
   }
