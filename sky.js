@@ -126,7 +126,7 @@
     p.water=lerpHex(p.water,new T.Color(0x3C6E80).multiplyScalar(.4+.6*day).getHex(),.35*o);
     p.sunI*=1-.55*o;p.glowOp*=1-.85*o;p.hemiI*=1-.08*o;
     p.cloudN=Math.min(1,.12+o*.95);
-    p.fogNear=95-o*20;p.fogFar=270-o*70;
+    p.fogNear=(95-o*20)*1.6;p.fogFar=(270-o*70)*1.6;
     if(w.fog){p.fogNear=14;p.fogFar=120;p.hor=lerpHex(p.hor,new T.Color(0xB9C3CA).multiplyScalar(.25+.75*day).getHex(),.7);}
     if(w.precip){p.fogFar=Math.min(p.fogFar,170);}
     p.sdir=dirOf(sun.el,sun.az);

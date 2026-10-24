@@ -29,15 +29,15 @@
   O.build=function(scene,cx,cz){
     st.scene=scene;st.cx=cx;st.cz=cz;
     // sea surface (animated swell)
-    var geo=new T.PlaneGeometry(640,640,128,128);geo.rotateX(-Math.PI/2);
+    var geo=new T.PlaneGeometry(900,900,144,144);geo.rotateX(-Math.PI/2);
     st.base=geo.attributes.position.array.slice();
     st.water=new T.Mesh(geo,new T.MeshPhongMaterial({color:0x2FA6CF,flatShading:true,shininess:70,specular:0xA8E4F5}));
     st.water.position.set(cx,-4.3,cz);st.water.receiveShadow=true;scene.add(st.water);
     // current stripes, two layers drifting in different directions
     st.str=[];
     [[stripeTex(7),9,-3.72,.02,.008],[stripeTex(31),6,-3.68,-.012,.015]].forEach(function(s){
-      var g=new T.PlaneGeometry(640,640);g.rotateX(-Math.PI/2);
-      s[0].repeat.set(s[1],s[1]);
+      var g=new T.PlaneGeometry(900,900);g.rotateX(-Math.PI/2);
+      s[0].repeat.set(s[1]*1.4,s[1]*1.4);
       var m=new T.Mesh(g,new T.MeshBasicMaterial({map:s[0],transparent:true,opacity:.34,depthWrite:false}));
       m.position.set(cx,s[2],cz);scene.add(m);st.str.push({m:m,t:s[0],vx:s[3],vy:s[4]});
     });
@@ -71,17 +71,17 @@
     // clouds
     st.clouds=[];st.cmat=new T.MeshBasicMaterial({color:0xffffff,fog:false});
     var i,j;
-    for(i=0;i<9;i++){
+    for(i=0;i<14;i++){
       var c=new T.Group(),k=3+(i%3);
       for(j=0;j<k;j++){var s=new T.Mesh(new T.SphereGeometry(1,10,8),st.cmat);s.scale.set(7+Math.random()*5,3+Math.random()*2,4+Math.random()*3);s.position.set((j-k/2)*7,Math.random()*1.5,Math.random()*3);c.add(s);}
-      c.position.set(-160+i*55+Math.random()*20,52+Math.random()*22,-150+Math.random()*130);
+      c.position.set(cx-330+i*48+Math.random()*20,64+Math.random()*26,cz-300+Math.random()*420);
       c.userData.v=1.2+Math.random()*1.2;scene.add(c);st.clouds.push(c);
     }
     // birds: three flocks circling the archipelago
     st.birds=[];st.bmat=new T.MeshBasicMaterial({color:0x26323B,side:T.DoubleSide,fog:false});
     var wg=new T.BufferGeometry();
     wg.setAttribute('position',new T.BufferAttribute(new Float32Array([0,0,0, 1.5,.05,.25, .35,0,-.6]),3));
-    var flocks=[[60,22,.11,0],[78,27,-.08,2.1],[92,18,.07,4.2]];
+    var flocks=[[110,26,.07,0],[140,32,-.05,2.1],[170,22,.045,4.2]];
     flocks.forEach(function(f,fi){
       for(var b=0;b<4;b++){
         var g=new T.Group(),wr=new T.Mesh(wg,st.bmat),wl=new T.Mesh(wg,st.bmat);wl.scale.x=-1;
@@ -200,14 +200,14 @@
   }
 
   O.addRing=function(x,z,phase){
-    var g=new T.RingGeometry(5.9,6.9,6,1);g.rotateZ(Math.PI/6);g.rotateX(-Math.PI/2);
+    var g=new T.RingGeometry(11.8,13.8,6,1);g.rotateZ(Math.PI/6);g.rotateX(-Math.PI/2);
     var m=new T.Mesh(g,new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.5,depthWrite:false}));
     m.position.set(x,-3.9,z);st.scene.add(m);st.rings.push({m:m,ph:phase});
   };
 
   O.theme=function(mode,sunLight){
     var P=PAL[mode];
-    st.scene.fog=new T.Fog(P.hor,95,270);st.scene.background=new T.Color(P.hor);
+    st.scene.fog=new T.Fog(P.hor,150,430);st.scene.background=new T.Color(P.hor);
     st.water.material.color.setHex(P.water);st.water.material.specular.setHex(P.spec);
     st.str.forEach(function(s){s.m.material.opacity=P.stripeA;});
     var pos=st.dome.geometry.attributes.position,col=st.dome.geometry.attributes.color,i,h,c1=new T.Color(P.hor),c2=new T.Color(P.top),c=new T.Color();
@@ -248,7 +248,7 @@
     }else st.pg.visible=false;
     if(st.thunder&&!reduce){st.flT-=dt;if(st.flT<0){st.fl=1;st.flT=4+Math.random()*7;}}
     st.fl=Math.max(0,st.fl-dt*4);
-    st.clouds.forEach(function(c){c.position.x+=c.userData.v*dt;if(c.position.x>230)c.position.x=-230;});
+    st.clouds.forEach(function(c){c.position.x+=c.userData.v*dt;if(c.position.x>st.cx+380)c.position.x=st.cx-380;});
     st.birds.forEach(function(b){
       var th=b.ph+t*b.sp,cx=st.cx,cz=st.cz,dir=b.sp>0?1:-1;
       var px=cx+Math.cos(th)*b.r,pz=cz+Math.sin(th)*b.r;
