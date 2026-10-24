@@ -13,7 +13,8 @@
     return (j&&Array.isArray(j.students)?j.students:[]).filter(function(s){
       return s&&s.sid&&s.nickname&&ids[s.island_id]&&/^#[0-9A-Fa-f]{6}$/.test(s.body_color);
     }).map(function(s){return {sid:String(s.sid),nickname:String(s.nickname).slice(0,12),island_id:s.island_id,body_color:s.body_color,
-      hat:has(HATS,s.hat||'')?(s.hat||''):'',face:has(FACES,s.face)?s.face:'smile',bio:String(s.bio||'').slice(0,60)};});
+      hat:has(HATS,s.hat||'')?(s.hat||''):'',face:has(FACES,s.face)?s.face:'smile',bio:String(s.bio||'').slice(0,60),
+      badges:(Array.isArray(s.badges)?s.badges:[]).filter(function(b){return ids[b];})};});
   }
   function live(){return !!(S.cfg.api&&S.cfg.clientId);}
   function api(body){
@@ -26,7 +27,7 @@
       S.list=clean(j);if(S.me)merge(S.me);World.setStudents(S.list);}).catch(function(e){console.warn('讀取同學名單失敗',e);});
   }
   function merge(me){
-    var mine={sid:me.sid||'me',nickname:me.nickname,island_id:me.island_id,body_color:me.body_color,hat:me.hat||'',face:me.face||'smile',bio:me.bio||''};
+    var mine={sid:me.sid||'me',nickname:me.nickname,island_id:me.island_id,body_color:me.body_color,hat:me.hat||'',face:me.face||'smile',bio:me.bio||'',badges:Array.isArray(me.badges)?me.badges:[]};
     var i=-1;S.list.forEach(function(s,k){if(s.sid===mine.sid)i=k;});
     if(i>-1)S.list[i]=mine;else S.list.push(mine);
   }
@@ -53,6 +54,25 @@
       }
     }else wait=8000;
     setTimeout(syncLoop,wait);
+  }
+
+  /* ---------- 徽章 ---------- */
+  function hasBadge(id){return !!(S.me&&S.me.badges&&S.me.badges.indexOf(id)>-1);}
+  function canSave(){return !!(live()&&S.token&&S.me);}
+  function loginHint(){
+    if(!live())return '目前是示範模式，徽章不會保存。';
+    if(!S.token)return '登入並建立角色後，再挑戰一次，徽章才會留下紀錄。';
+    return '先建立你的角色，徽章才會留下紀錄。';
+  }
+  function submitBadge(id,answers){
+    return api({action:'badge',token:S.token,island_id:id,answers:answers}).then(function(j){
+      if(j.passed){
+        S.me.badges=j.badges;merge(S.me);World.setStudents(S.list);World.setSelfBadges(j.badges.length);
+        var d=S.o.D.filter(function(x){return x.id===id;})[0];
+        World.say('s:'+mySid(),'拿到「'+(d?d.name:id)+'」徽章了！','我',8000,'stu');
+      }
+      return j;
+    }).catch(function(e){if(/逾時|無效/.test(e.message)){S.token=null;throw new Error('登入已逾時，請重新登入後再交卷。');}throw e;});
   }
 
   /* ---------- 預覽 ---------- */
@@ -226,13 +246,14 @@
       refresh();setInterval(function(){if(!document.hidden)refresh();},90000);
       pollChat();setInterval(pollChat,8000);setTimeout(syncLoop,1500);
       o.detail.addEventListener('keydown',function(e){if(e.target.id==='chatIn'&&e.key==='Enter'){e.preventDefault();sendChat(e.target.value);}});},
-    open:show,
+    open:show,hasBadge:hasBadge,canSave:canSave,loginHint:loginHint,submitBadge:submitBadge,
     html:function(id){
       var sid=id.slice(2),s=S.list.filter(function(x){return x.sid===sid;})[0];if(!s)return '';
       var isl=S.o.D.filter(function(d){return d.id===s.island_id;})[0];
       var mineBtn=(S.me&&S.me.sid===s.sid)||(!live()&&s.sid==='me')?'<div class="actrow"><button class="primary" data-act="edit">編輯我的角色</button></div>':'';
       return '<button class="back" data-act="back">← 回到總覽</button><div style="margin-top:12px"><span class="kind" style="--t:'+esc(s.body_color)+'">同學</span></div>'+
         '<h2>'+esc(s.nickname)+'</h2><p>'+(s.bio?esc(s.bio):'這位同學還沒有寫自我介紹。')+'</p>'+
+        (s.badges&&s.badges.length?'<h3>徽章（'+s.badges.length+'）</h3><div class="tags">'+s.badges.map(function(b){var d=S.o.D.filter(function(x){return x.id===b;})[0];return '<span>🏅 '+esc(d?d.name:b)+'</span>';}).join('')+'</div>':'')+
         '<h3>住在</h3><div class="tags"><button data-go="'+esc(s.island_id)+'"><i></i>'+esc(isl?isl.name:'')+'</button></div>'+mineBtn+chatHTML(mySid()&&s.sid===mySid()?'':s.nickname);
     }
   };

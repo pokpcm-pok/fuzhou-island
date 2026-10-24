@@ -215,7 +215,7 @@
       var hx=o.d.x+SLOTS[k][0],hz=o.d.z+SLOTS[k][1],ry=Math.atan2(-SLOTS[k][0],-SLOTS[k][1])+((idx%5)-2)*.12;
       var g=Props.char(s.hat||'',1.0,col,s.face);g.rotation.y=ry;g.position.set(hx,0,hz);
       g.traverse(function(m){m.userData.id=id;});st.scene.add(g);
-      var tag=document.createElement('button');tag.className='tag stu';tag.textContent=s.nickname;tag.dataset.id=id;st.labels.appendChild(tag);
+      var tag=document.createElement('button');tag.className='tag stu';tag.textContent=s.nickname+(s.badges&&s.badges.length?' 🏅'+s.badges.length:'');tag.dataset.id=id;st.labels.appendChild(tag);
       var n={g:g,o:o,tag:tag,sid:s.sid,hx:hx,hz:hz,x:hx,z:hz,tx:hx,tz:hz,tr:ry,ry:ry,live:false,moving:false,ph:idx*.7,id:id},od=old[s.sid];
       if(od&&od.live){n.x=od.x;n.z=od.z;n.tx=od.tx;n.tz=od.tz;n.tr=od.tr;n.live=true;}
       st.stuNodes.push(n);
@@ -231,6 +231,9 @@
       else n.live=false;
     });
   };
+  function selfLabel(){if(st.selfTag)st.selfTag.textContent=st.selfNick+'（我）'+(st.selfN?' 🏅'+st.selfN:'');}
+  W.setSelfBadges=function(n){st.selfN=n;selfLabel();};
+  W.onIsland=function(id){var o=st.byId[id];if(!o)return false;var dx=st.player.position.x-o.d.x,dz=st.player.position.z-o.d.z,r=RT*1.15;return dx*dx+dz*dz<r*r;};
   W.getPos=function(){return {x:st.player.position.x,z:st.player.position.z,r:st.faceY};};
   function turn(cur,to,k){var d=to-cur;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return cur+d*Math.min(1,k);}
   function updateStu(n,dt,t){
@@ -254,7 +257,7 @@
       p.traverse(function(m){m.userData.id=sid;});
       st.stuIsland[sid]=prof.island_id;
       if(!st.selfTag){var tg=document.createElement('button');tg.className='tag stu me';st.labels.appendChild(tg);st.selfTag=tg;}
-      st.selfTag.textContent=prof.nickname+'（我）';st.selfTag.dataset.id=sid;st.selfTag.style.display='';
+      st.selfNick=prof.nickname;st.selfN=(prof.badges||[]).length;selfLabel();st.selfTag.dataset.id=sid;st.selfTag.style.display='';
       var isl=st.byId[prof.island_id];if(spawn&&isl)pos.set(isl.d.x+3.2,0,isl.d.z+3.4);
     }else{
       st.selfSid=null;p=Props.drop();p.traverse(function(m){m.userData.me=true;});

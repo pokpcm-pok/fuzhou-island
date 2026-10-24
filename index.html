@@ -79,6 +79,9 @@ h1 span{color:var(--accent)}
 .tag.boss.sel{background:var(--accent);color:var(--accent-fg)}
 .hud{position:absolute;top:10px;right:10px;display:flex;gap:8px}
 .hud button{border:2px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:13px;font-weight:500}
+.qopt{display:block;width:100%;text-align:left;margin:6px 0;border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.5}
+.qopt.ok{background:#CFF3D8;color:#14361F}.qopt.bad{background:#FFD0D6;color:#4A1020}.qopt:disabled{cursor:default}
+.qq{margin:6px 0}.qfb{font-size:13.5px;margin:10px 0}.qok{font-weight:700;color:#1F7A3E}
 .skybox{position:absolute;right:12px;top:52px;z-index:9;width:min(290px,calc(100% - 24px));background:var(--panel);color:var(--fg);border:2px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
 .skybox[hidden]{display:none}.skybox h4{margin:0 0 8px;font-size:15px}
 .skybox label{display:block;font-size:12px;font-weight:600;margin-top:8px}
@@ -193,6 +196,7 @@ h1 span{color:var(--accent)}
 <script src="sky.js"></script>
 <script src="world.js"></script>
 <script src="talk.js"></script>
+<script src="quiz.js"></script>
 <script src="students.js"></script>
 <script src="config.js"></script>
 <script>
@@ -245,6 +249,7 @@ function boot(DATA){
     if(d.equip.length)h+='<h3>設備與空間</h3><ul class="things">'+d.equip.map(function(t){return '<li><b>'+esc(t[0])+'</b><span>'+esc(t[1])+'</span></li>';}).join('')+'</ul>';
     if(d.acts.length)h+='<h3>活動</h3><div class="tags">'+d.acts.map(function(a){return '<span>'+esc(a)+'</span>';}).join('')+'</div>';
     if(d.id==='courses')h+=rulesHTML();
+    if(window.Quiz)h+=Quiz.section(d.id);
     h+='<h3>走橋就到的鄰島</h3><div class="tags">'+d.nb.map(function(id){var o=byId[id];return '<button data-go="'+id+'" style="--t:var(--'+o.hue+'-t)"><i></i>'+esc(o.name)+'</button>';}).join('')+'</div>';
     h+='<p class="note">課程依 113 學年度日間學士班課程地圖整理；設備與活動為示範內容，請以系上實際資料為準。</p>';
     return h;
@@ -294,6 +299,7 @@ function boot(DATA){
   if(src)src.textContent=DATA.updated?('資料來源：Google Sheet，更新於 '+new Date(DATA.updated).toLocaleString('zh-TW')):'資料來源：內建示範資料';
   var cfg=window.ISLAND_CONFIG||{};
   if(window.Talk)Talk.set(DATA.talk);
+  if(window.Quiz)Quiz.init({detail:detail,D:D,api:cfg.API_URL||''});
   Students.init({D:D,detail:detail,cfg:{api:cfg.API_URL||'',clientId:cfg.GOOGLE_CLIENT_ID||''}});
   $('#bMe').addEventListener('click',function(){Students.open();});
   if(ok&&window.Sky)Sky.init();
