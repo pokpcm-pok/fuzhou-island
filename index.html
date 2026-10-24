@@ -285,6 +285,7 @@ function boot(DATA){
     bs.addEventListener('click',function(){var on=bs.getAttribute('aria-pressed')!=='true';put(on?'1':'0');apply(on);});
     var saved=get();
     if(saved==='1'||saved==='0'){apply(saved==='1');return;}
+    if(ok&&World.onSlow)World.onSlow(function(fps){if(get()!==null)return;apply(true);World.say('me','畫面有點卡（約 '+Math.round(fps)+' 格/秒），已自動開啟省電模式，可按左上「省電」關閉',null,9000);});
     var c=navigator.connection||{};
     if(c.saveData||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)){apply(true);return;}
     if(navigator.getBattery)navigator.getBattery().then(function(b){if(!b.charging&&b.level<=.2&&get()===null)apply(true);}).catch(function(){});

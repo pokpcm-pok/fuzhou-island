@@ -141,6 +141,7 @@
     P.S=o.S;P.RT=o.RT;P.GATE=o.RT*SQ3/2-.5;P.data=o.data;
     var byId={};o.data.forEach(function(d){byId[d.id]=d;});
     C.routes=[];C.stops=[];C.buses=[];C.byId=byId;
+    buildBoss();
     DEFS.forEach(function(def){
       var R=buildRoute(def,byId);if(!R)return;C.routes.push(R);
       R.dw.forEach(function(w,i){
@@ -223,13 +224,135 @@
     if(!matVC)matVC=new T.MeshLambertMaterial({vertexColors:true});
     var o=kind==='ferris'?makeFerris():makeSwing();o.island=d;float.add(o.group);C.rides.push(o);o.update(Date.now()/1000);return o;
   };
+
+  /* ---------- BOSS 波客老師：依時間在群島間散步（所有同學看到的位置一致） ---------- */
+  var BSPD=3.6;
+  function buildBoss(){
+    var data=P.data,byId=C.byId,rnd=rng(777),cur=byId.courses,prev=null,k,i;
+    if(!cur)return;
+    var dirs=[[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
+    function nbs(d){var out=[];dirs.forEach(function(v){data.forEach(function(o){if(o.q===d.q+v[0]&&o.r===d.r+v[1])out.push(o);});});return out;}
+    function spot(d){var a=rnd()*6.283,rr=4.8+rnd()*1.8;return {x:d.x+Math.cos(a)*rr,z:d.z+Math.sin(a)*rr};}
+    var wp=[],t=0;
+    function addPt(x,z,pause,face){wp.push({x:x,z:z,pause:pause||0,face:face||0});}
+    var s0=spot(cur);addPt(s0.x,s0.z,6+rnd()*6,rnd()*6.28);
+    for(k=0;k<26;k++){
+      var nb=nbs(cur).filter(function(n){return n!==prev;});if(!nb.length)nb=nbs(cur);
+      var nx=nb[Math.floor(rnd()*nb.length)],dx=nx.x-cur.x,dz=nx.z-cur.z,L=Math.hypot(dx,dz),ux=dx/L,uz=dz/L;
+      if(rnd()<.5){var s1=spot(cur);addPt(s1.x,s1.z,4+rnd()*5,rnd()*6.28);}
+      addPt(cur.x+ux*8.6,cur.z+uz*8.6,0);addPt(nx.x-ux*8.6,nx.z-uz*8.6,0);
+      var sp=spot(nx);addPt(sp.x,sp.z,6+rnd()*8,rnd()*6.28);
+      prev=cur;cur=nx;
+    }
+    for(i=0;i<wp.length;i++){
+      wp[i].t0=t;if(i>0)t+=Math.hypot(wp[i].x-wp[i-1].x,wp[i].z-wp[i-1].z)/BSPD;
+      wp[i].t1=t;wp[i].t2=t+wp[i].pause;t=wp[i].t2;
+      wp[i].tArr=wp[i].t1;
+    }
+    C.boss={wp:wp,T:t};
+  }
+  C.bossAt=function(nowS){
+    var B=C.boss;if(!B)return null;
+    var tau=((nowS%(2*B.T))+2*B.T)%(2*B.T),rev=tau>B.T;if(rev)tau=2*B.T-tau;
+    var w=B.wp,i,lo=0,hi=w.length-1;
+    // 找到 tau 所在的路標
+    while(hi-lo>1){var m=(lo+hi)>>1;if(w[m].tArr<=tau)lo=m;else hi=m;}
+    var a=w[lo];
+    if(tau<=a.t2||lo===w.length-1)return {x:a.x,z:a.z,moving:false,face:a.face};
+    var b=w[lo+1],u=Math.max(0,Math.min(1,(tau-a.t2)/(b.tArr-a.t2))),dx=b.x-a.x,dz=b.z-a.z,dir=rev?-1:1;
+    return {x:a.x+dx*u,z:a.z+dz*u,moving:true,face:Math.atan2(dx*dir,dz*dir)};
+  };
+
+  /* ---------- 海上：小島與船隊（海盜船、潛水艇、軍艦） ---------- */
+  function hullBow(B,w,len,hgt,col,z0,y0){ // 船頭三角（朝 +z）
+    B.add(new T.ConeGeometry(w/2,len,6),col,0,y0,z0,Math.PI/2,0,0,1,1,hgt/w);
+  }
+  function makePirate(){
+    var B=new Baker(),k;
+    bx(B,3.6,1.6,10,0x8A5A33,0,.5,-.5);hullBow(B,3.6,4.5,1.6,0x8A5A33,6.6,.5);
+    bx(B,3.8,.25,10,0x5A3A1E,0,1.4,-.5);bx(B,3.4,1.4,3.2,0x6B4423,0,2.0,-4.4);bx(B,3.5,.2,3.4,0x5A3A1E,0,2.8,-4.4);
+    cy(B,.18,.22,10,0x4A2E17,0,5.5,1.8,6);cy(B,.16,.2,8,0x4A2E17,0,5,-2.8,6);
+    bx(B,5.4,4.2,.1,0x2B2F33,0,6.2,1.9);bx(B,4.6,3.4,.1,0x2B2F33,0,5.6,-2.7);
+    bx(B,1.5,1.5,.12,0xF2F5F7,0,6.4,2.0);sp(B,.35,0xF2F5F7,0,6.6,2.1);bx(B,.9,.2,.12,0xF2F5F7,0,5.9,2.1);
+    bx(B,1.2,.8,.08,0x23282D,0,10.8,1.8);
+    B.add(new T.CylinderGeometry(.12,.12,3.6,6),0x4A2E17,0,2.4,8.6,Math.PI/2+.5,0,0);
+    for(k=-1;k<=1;k+=2){cy(B,.22,.22,.8,0x23282D,k*1.75,1.7,.5,8);cy(B,.22,.22,.8,0x23282D,k*1.75,1.7,-1.8,8);}
+    return {mesh:B.mesh(matVC,false),len:14,wake:3.2};
+  }
+  function makeSub(){
+    var B=new Baker();
+    B.add(new T.CylinderGeometry(1.5,1.5,13,12),0x3E4A52,0,.1,0,Math.PI/2,0,0);
+    sp(B,1.5,0x3E4A52,0,.1,6.5);sp(B,1.5,0x3E4A52,0,.1,-6.5,1,1,1.3);
+    bx(B,1.5,2.4,3.4,0x2F3A41,0,1.9,.8);bx(B,1.3,.2,3.2,0xFFD400,0,3.2,.8);
+    cy(B,.09,.09,2.2,0x23282D,0,4.3,1.6,6);bx(B,.5,.12,.5,0x23282D,0,5.4,1.9);
+    bx(B,4.2,.15,1.2,0xFFD400,0,.1,-5.6);bx(B,.15,2.6,1.2,0xFFD400,0,.1,-5.6);
+    bx(B,.9,.9,.12,0xFFD400,0,.4,7.9);cy(B,.4,.4,.5,0x23282D,0,.1,-7.9,10);
+    [0.8,-1.2,-3.2].forEach(function(z){B.add(new T.SphereGeometry(.28,8,6),0xBFE7F5,1.45,.5,z);B.add(new T.SphereGeometry(.28,8,6),0xBFE7F5,-1.45,.5,z);});
+    return {mesh:B.mesh(matVC,false),len:16,wake:2.6,low:true};
+  }
+  function makeWar(){
+    var B=new Baker(),k;
+    bx(B,3.8,2.0,13,0x7C8A94,0,.7,-1);hullBow(B,3.8,5.5,2.0,0x7C8A94,8.2,.7);
+    bx(B,3.9,.25,13,0x5F6C75,0,1.8,-1);bx(B,3.0,2.4,3.6,0x9AA7AE,0,3.1,-1);bx(B,2.6,1.2,2.6,0x8795A0,0,4.9,-1);
+    bx(B,2.7,.35,2.8,0x23323C,0,4.7,-.3);
+    cy(B,.7,.8,2.4,0x5F6C75,0,4.4,-4.2,10);bx(B,.9,.05,.9,0xE6007E,0,5.65,-4.2);
+    cy(B,.08,.08,3.2,0x3A444C,0,7.2,-1,6);bx(B,1.8,.12,.5,0x3A444C,0,8.4,-1);
+    [[0,3.7,4.3],[0,3.7,-6.2]].forEach(function(p){cy(B,1.0,1.1,.8,0x5F6C75,p[0],p[1]-1.2,p[2],12);
+      B.add(new T.CylinderGeometry(.2,.2,4,8),0x3A444C,p[0],p[1]-.7,p[2]+(p[2]>0?2.4:2.4),Math.PI/2,0,0);});
+    bx(B,.9,.5,.12,0xF2F5F7,0,6.3,-1.2);
+    for(k=0;k<3;k++)sp(B,.25,0x3A444C,1.9,1.6,1.6-k*2.4);
+    return {mesh:B.mesh(matVC,false),len:19,wake:3.4};
+  }
+  var FLEETS=[
+    {type:'pirate',n:3,R:140,sp:6.0,dir:1,ph:0.4,gap:.075},
+    {type:'war',n:4,R:178,sp:7.5,dir:-1,ph:2.1,gap:.07},
+    {type:'sub',n:3,R:116,sp:4.2,dir:1,ph:3.9,gap:.085}
+  ];
+  C.buildSea=function(scene,cx,cz){
+    if(!matVC)matVC=new T.MeshLambertMaterial({vertexColors:true});
+    C.sea={cx:cx,cz:cz,ships:[]};
+    // 小島：沙灘底座 + 草地 + 樹
+    var B=new Baker(),r=rng(4242),k,j;
+    var bands=[[96,104,4],[150,162,4],[190,215,4]],idx=0;
+    bands.forEach(function(bd){for(k=0;k<bd[2];k++){
+      var a=(k/bd[2])*Math.PI*2+r()*.8+idx*.37,rr=bd[0]+r()*(bd[1]-bd[0]),x=cx+Math.cos(a)*rr,z=cz+Math.sin(a)*rr,sz=4+r()*3.5;idx++;
+      B.add(new T.CylinderGeometry(sz,sz*1.25,4.8,10),0xE8D9A8,x,-5.6,z);
+      B.add(new T.CylinderGeometry(sz*.82,sz*.9,.5,10),0x6CC27F,x,-3.15,z);
+      var nt=2+Math.floor(r()*3);
+      for(j=0;j<nt;j++){var ta=r()*6.28,tr=r()*sz*.5;B.at(x+Math.cos(ta)*tr,-3.0,z+Math.sin(ta)*tr,r()*6.28,.8+r()*.5);(r()<.35?ITEM.pine:ITEM.tree)(B,r);B.reset();}
+      B.at(x+sz*.55,-3.0,z-sz*.2,r()*6,1);ITEM.rock(B,r);B.reset();
+    }});
+    var im=B.mesh(matVC,false);scene.add(im);
+    // 船隊
+    var models={pirate:makePirate(),sub:makeSub(),war:makeWar()};
+    var wakeMat=new T.MeshBasicMaterial({color:0xFFFFFF,transparent:true,opacity:.38,depthWrite:false});
+    FLEETS.forEach(function(f){
+      for(k=0;k<f.n;k++){
+        var m=models[f.type],g=new T.Group(),mesh=m.mesh.clone();g.add(mesh);
+        var wk=new T.Mesh(new T.PlaneGeometry(m.wake*2.2,m.len*1.5),wakeMat);wk.rotation.x=-Math.PI/2;wk.position.set(0,-.3,-m.len*.9);g.add(wk);
+        scene.add(g);C.sea.ships.push({g:g,f:f,k:k,m:m});
+      }
+    });
+  };
+  C.updateSea=function(t){
+    var S2=C.sea;if(!S2)return;
+    S2.ships.forEach(function(s){
+      var f=s.f,a;
+      a=f.ph+f.dir*(f.sp*t/f.R)-f.dir*s.k*(f.gap*Math.PI*2);
+      var x=S2.cx+Math.cos(a)*f.R,z=S2.cz+Math.sin(a)*f.R;
+      var hx=-Math.sin(a)*f.dir,hz=Math.cos(a)*f.dir;
+      s.g.position.set(x,(s.m.low?-4.6:-4.1)+Math.sin(t*1.1+s.k*1.7+f.ph)*.22,z);
+      s.g.rotation.set(0,Math.atan2(hx,hz),Math.sin(t*.9+s.k)*.05,'YXZ');
+    });
+  };
   C.stationAt=function(d){return {x:d.x+ST.x,z:d.z+ST.z};};
   C.stationLocal=ST;
 
   /* ---------- 每座島：環島道路、小物件、站牌、YouBike 站 ---------- */
   C.decorate=function(d,i,float,opts){
     opts=opts||{};
-    if(!matVC){matVC=new T.MeshLambertMaterial({vertexColors:true});matBulb=new T.MeshBasicMaterial({color:0xFFE9A0});}
+    if(!matBulb)matBulb=new T.MeshBasicMaterial({color:0xFFE9A0});
+    if(!matVC)matVC=new T.MeshLambertMaterial({vertexColors:true});
     var B=new Baker(),L=new Baker(),r=rng(i*7+11),k,a;
     // 環島道路：一圈灰色柏油 + 白色邊線 + 黃色中線虛線
     B.add(new T.RingGeometry(ROAD_IN,ROAD_OUT,72),0x6E7B85,0,.04,0,-Math.PI/2,0,0);
@@ -344,6 +467,7 @@
   };
   C.update=function(nowS,dt){
     C.rides.forEach(function(r){r.update(nowS);});
+    C.updateSea(nowS);
     C.buses.forEach(function(b){
       var R=b.route,raw=nowS+b.off,tau=((raw%R.Tc)+R.Tc)%R.Tc,st=routeAt(R,tau),p=pathAt(R,st.s,LANE);
       var want=Math.atan2(p.tx,p.tz);

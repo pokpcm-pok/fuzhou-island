@@ -103,7 +103,7 @@
       if(moved){S.lp={x:p.x,z:p.z};S.lm=Date.now();}
       var idle=S.lm&&Date.now()-S.lm>30000;if(idle)wait=8000;
       if(S.sess&&S.me){
-        api({action:'sync',sess:S.sess,x:Math.round(p.x*10)/10,z:Math.round(p.z*10)/10,r:Math.round(p.r*100)/100}).then(applyPos)
+        api({action:'sync',sess:S.sess,x:Math.round(p.x*10)/10,z:Math.round(p.z*10)/10,r:Math.round(p.r*100)/100,y:Math.round((p.y||0)*10)/10,m:p.m?1:0}).then(applyPos)
           .catch(function(e){if(/逾時|無效|請重新/.test(e.message))S.sess=null;});
       }else{
         wait=5000;
