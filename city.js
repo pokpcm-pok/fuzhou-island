@@ -310,12 +310,13 @@
   ];
   C.buildSea=function(scene,cx,cz){
     if(!matVC)matVC=new T.MeshLambertMaterial({vertexColors:true});
-    C.sea={cx:cx,cz:cz,ships:[]};
+    C.sea={cx:cx,cz:cz,ships:[],islets:[]};
     // 小島：沙灘底座 + 草地 + 樹
     var B=new Baker(),r=rng(4242),k,j;
     var bands=[[96,104,4],[150,162,4],[190,215,4]],idx=0;
     bands.forEach(function(bd){for(k=0;k<bd[2];k++){
       var a=(k/bd[2])*Math.PI*2+r()*.8+idx*.37,rr=bd[0]+r()*(bd[1]-bd[0]),x=cx+Math.cos(a)*rr,z=cz+Math.sin(a)*rr,sz=4+r()*3.5;idx++;
+      C.sea.islets.push({x:x,z:z,r:sz*1.3});
       B.add(new T.CylinderGeometry(sz,sz*1.25,4.8,10),0xE8D9A8,x,-5.6,z);
       B.add(new T.CylinderGeometry(sz*.82,sz*.9,.5,10),0x6CC27F,x,-3.15,z);
       var nt=2+Math.floor(r()*3);
@@ -491,5 +492,6 @@
   };
   C.nextStop=function(stop){var R=stop.route,w=R.dw[(stop.dwi+1)%R.dw.length];return {island:w.island,stop:C.stopOf(R,(stop.dwi+1)%R.dw.length)};};
   C.stopOf=function(R,i){for(var k=0;k<C.stops.length;k++)if(C.stops[k].route===R&&C.stops[k].dwi===i)return C.stops[k];return null;};
+  C.kit={Baker:Baker,bx:bx,cy:cy,sp:sp,co:co,rng:rng,wrap:wrap,vc:function(){if(!matVC)matVC=new T.MeshLambertMaterial({vertexColors:true});return matVC;}};
   window.City=C;
 })();

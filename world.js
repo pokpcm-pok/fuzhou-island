@@ -34,6 +34,9 @@
     buildWorld();
     buildPlayer();
     City.addBuses(st.scene);
+    Life.init(st.scene,CX,CZ,st.islands);
+    st.dock=Life.dock(st.byId.harbor.d,st.byId.harbor.float,st);
+    st.boatObj=Life.makeBoat();st.boatObj.visible=false;st.scene.add(st.boatObj);
     st.bikeObj=City.makeBike();st.bikeObj.visible=false;st.scene.add(st.bikeObj);
     var ae=document.createElement('button');ae.className='tag act';ae.style.display='none';st.labels.appendChild(ae);st.actEl=ae;
     st.stuIsland={};st.stuNodes=[];
@@ -66,7 +69,7 @@
       City.decorate(d,i,float,{stops:City.stops.filter(function(x){return x.island===d;}),slots:slotsOf(d.id),boss:d.id==='courses',lm:Ly.lm,npc:Ly.npc,extra:Ly.ride?[[0,0,4.8]]:null});
       if(Ly.ride)City.addRide(Ly.ride,d,float);
       g.add(float);st.scene.add(g);
-      var o={npc:NP,d:d,g:g,float:float,top:top,side:side,char:ch,lm:lm,phase:i*.8,hue:d.hue};
+      var o={npc:NP,d:d,g:g,float:float,top:top,side:side,char:ch,lm:lm,phase:i*.8,hue:d.hue,lmA:Life.landmark(lm,d.landmark),lmx:d.x+LP[0],lmz:d.z+LP[1]};
       st.islands.push(o);st.byId[d.id]=o;
       var tag=document.createElement('button');tag.className='tag';tag.textContent=d.name;tag.dataset.id=d.id;st.labels.appendChild(tag);o.tag=tag;
       top.userData.id=d.id;side.userData.id=d.id;lm.traverse(function(m){m.userData.id=d.id;});ch.traverse(function(m){m.userData.id=d.id;m.userData.npc='res';});
@@ -140,6 +143,7 @@
     var i,o,dx,dz,r=RT*.92;
     for(i=0;i<st.islands.length;i++){o=st.islands[i].d;dx=x-o.x;dz=z-o.z;if(dx*dx+dz*dz<r*r)return true;}
     for(i=0;i<st.bridges.length;i++){var b=st.bridges[i];if(segDist(x,z,b.a.x,b.a.z,b.b.x,b.b.z)<1.9)return true;}
+    if(st.dock&&segDist(x,z,st.dock.a.x,st.dock.a.z,st.dock.b.x,st.dock.b.z)<1.6)return true;
     return false;
   }
   function segDist(px,pz,ax,az,bx,bz){var vx=bx-ax,vz=bz-az,t=((px-ax)*vx+(pz-az)*vz)/(vx*vx+vz*vz);t=Math.max(0,Math.min(1,t));var cx=ax+vx*t-px,cz=az+vz*t-pz;return Math.sqrt(cx*cx+cz*cz);}
@@ -150,7 +154,7 @@
     var p=[b],c2=b;while(prev[c2]){c2=prev[c2];p.unshift(c2);}return p;
   }
   W.walkTo=function(id){
-    if(st.ride)return;
+    if(st.ride||st.boat)return;
     var tg=id==='boss'?nearestIsland(st.bossPos.x,st.bossPos.z):(st.byId[id]||st.byId[st.stuIsland[id]]);if(!tg)return;
     var from=nearestIsland(st.player.position.x,st.player.position.z).d.id;
     var ids=bfs(from,tg.d.id),path=[],i;
@@ -166,6 +170,7 @@
     var p=st.player.position,mv=new T.Vector3(),moving=false,SP=SPEED*(st.biking?BIKE:1);
     if(st.ride){rideStep();st.walking=false;return;}
     if(st.fun){funStep();st.walking=false;return;}
+    if(st.boat){boatStep(dt);st.walking=false;return;}
     if(st.path.length){
       var t=st.path[0],dx=t.x-p.x,dz=t.z-p.z,d=Math.sqrt(dx*dx+dz*dz);
       if(d<.25){st.path.shift();}else{mv.set(dx/d,0,dz/d);moving=true;p.x+=mv.x*SP*dt;p.z+=mv.z*SP*dt;}
@@ -187,6 +192,7 @@
 
   /* ---------- YouBike 與公車 ---------- */
   function nowS(){return Date.now()/1000;}
+  var BOATV=26;
   function rideStep(){
     var r=st.ride,b=r.bus,p=st.player.position,s=b.state;
     p.x=b.x;p.z=b.z;st.faceY=b.hd;st.player.rotation.y=b.hd;
@@ -204,6 +210,22 @@
     if(done){p.x=f.d.x+r.gate[0];p.z=f.d.z+r.gate[1]-1.2;st.fun=null;st.path=[];W.say('me','下來囉！好玩嗎？',null,3000);return;}
     var q=r.seat(t,f.idx);p.x=f.d.x+q.x;p.z=f.d.z+q.z;f.y=q.y;
   }
+  function boatStep(dt){
+    var b=st.boat,p=st.player.position;
+    var ix=(st.keys.d||st.keys.ArrowRight?1:0)-(st.keys.a||st.keys.ArrowLeft?1:0)+st.joy.x;
+    var iy=(st.keys.w||st.keys.ArrowUp?1:0)-(st.keys.s||st.keys.ArrowDown?1:0)+st.joy.y;
+    var len=Math.sqrt(ix*ix+iy*iy);
+    if(len>1){ix/=len;iy/=len;len=1;}
+    if(len>.08){var y=st.cam.yaw,fx=-Math.sin(y),fz=-Math.cos(y),rx=Math.cos(y),rz=-Math.sin(y);
+      var vx=rx*ix+fx*iy,vz=rz*ix+fz*iy;b.hd=turn(b.hd,Math.atan2(vx,vz),dt*3.2);}
+    b.sp+=((len>.08?BOATV*len:0)-b.sp)*Math.min(1,dt*1.6);
+    b.x+=Math.sin(b.hd)*b.sp*dt;b.z+=Math.cos(b.hd)*b.sp*dt;
+    var dx=b.x-CX,dz=b.z-CZ,dd=Math.hypot(dx,dz);if(dd>280){b.x=CX+dx/dd*280;b.z=CZ+dz/dd*280;}
+    st.islands.forEach(function(o){var ex=b.x-o.d.x,ez=b.z-o.d.z,e=Math.hypot(ex,ez),m=RT+3.2;if(e<m){b.x=o.d.x+ex/e*m;b.z=o.d.z+ez/e*m;b.sp*=.6;}});
+    p.x=b.x;p.z=b.z;st.faceY=b.hd;st.player.rotation.y=b.hd;
+  }
+  function nearDock(p){return st.dock&&Math.hypot(st.dock.end.x-p.x,st.dock.end.z-p.z)<3.6;}
+  function nearSpot(b){return st.dock&&Math.hypot(st.dock.spot.x-b.x,st.dock.spot.z-b.z)<11;}
   function nearRide(p){
     var best=null,bd=1e9;City.rides.forEach(function(r){var d=Math.hypot(r.island.x+r.gate[0]-p.x,r.island.z+r.gate[1]-p.z);if(d<3.8&&d<bd){bd=d;best=r;}});return best;
   }
@@ -218,7 +240,8 @@
   function updateAct(){
     var el=st.actEl;if(!el)return;
     var p=st.player.position,txt=null,kind=null,data=null,t=nowS();
-    if(st.fun){txt=st.fun.ride.say(t,true);kind='funride';}
+    if(st.boat){if(nearSpot(st.boat)&&st.boat.sp<9){txt='🚤 回到碼頭・按此下船';kind='unboat';}else{txt='🚤 駕駛中・靠近碼頭可下船';kind='ride';}}
+    else if(st.fun){txt=st.fun.ride.say(t,true);kind='funride';}
     else if(st.ride){
       var cur=City.stopOf(st.ride.bus.route,st.ride.dw);
       if(cur){txt='🚌 '+cur.route.no+'・下一站：'+City.nextStop(cur).island.name;kind='ride';}
@@ -226,7 +249,8 @@
       if(nearestStation(p)<4.6){txt='🚲 在這裡還車';kind='return';}
     }else{
       var rd=nearRide(p);
-      if(nearestStation(p)<4.2){txt='🚲 租 YouBike（騎更快）';kind='rent';}
+      if(nearDock(p)){txt='🚤 搭快艇出海';kind='boat';}
+      else if(nearestStation(p)<4.2){txt='🚲 租 YouBike（騎更快）';kind='rent';}
       else if(rd){txt=rd.say(t,false);kind=rd.canBoard(t)?'fun':'wait';data={ride:rd};}
       else{
         var sp=nearStop(p);
@@ -246,15 +270,19 @@
     else if(a.kind==='board'){var b=a.data.bus;st.ride={bus:b,dw:b.state.dw,cyc:b.state.cyc};st.path=[];W.say('me','🚌 上車囉！到下一站會自動下車',null,3800);}
     else if(a.kind==='fun'){if(st.biking){W.say('me','請先在租借站還 YouBike 再玩設施喔',null,3500);return;}
       var r2=a.data.ride,t2=nowS();st.path=[];st.fun={kind:r2.kind,ride:r2,d:r2.island,t0:t2,idx:r2.pick(t2),cyc:Math.floor(t2/40),y:0};W.say('me',r2.say(t2,true),null,3500);}
-    else if(a.kind==='ride'){var rb=st.ride.bus;if(rb.state.dw>=0)alight(rb);}
+    else if(a.kind==='ride'){if(st.ride){var rb=st.ride.bus;if(rb.state.dw>=0)alight(rb);}}
+    else if(a.kind==='boat'){if(st.biking){W.say('me','請先在租借站還 YouBike 再搭快艇喔',null,3500);return;}
+      st.path=[];st.boat={x:st.dock.spot.x,z:st.dock.spot.z,hd:st.dock.ry,sp:0};st.faceY=st.dock.ry;W.say('me','🚤 出發！WASD／搖桿駕駛，回碼頭附近可下船',null,4200);}
+    else if(a.kind==='unboat'){var q=st.dock.end;st.player.position.set(q.x,0,q.z);st.boat=null;st.path=[];W.say('me','⚓ 靠岸囉！',null,2500);}
   }
   W.onSlow=function(fn){st.slowFn=fn;};
   W.act=doAct;W.debug=function(){return st;};
-  W.status=function(){return {bike:!!st.biking,ride:!!st.ride,fun:!!st.fun,act:st.act?st.act.kind:null};};
+  W.status=function(){return {boat:!!st.boat,bike:!!st.biking,ride:!!st.ride,fun:!!st.fun,act:st.act?st.act.kind:null};};
 
   /* ---------- selection ---------- */
   W.select=function(id,walk){
     st.sel=id;
+    if(id==='stats'&&st.byId.stats&&st.byId.stats.lmA.poke)st.byId.stats.lmA.poke();
     st.ring.visible=false;
     st.bridges.forEach(function(b){b.rail.color.setHex(0x8A5A33);});
     if(id&&id!=='boss'){
@@ -307,7 +335,7 @@
     pos=pos||{};
     (st.stuNodes||[]).forEach(function(n){
       var p=pos[n.sid],fresh=p&&isFinite(p.x)&&isFinite(p.z)&&now-p.t<20000;
-      if(fresh){if(!n.live){n.x=p.x;n.z=p.z;}n.live=true;n.tx=p.x;n.tz=p.z;n.tr=p.r||0;n.ty=p.y||0;n.bike=p.m===1;}
+      if(fresh){if(!n.live){n.x=p.x;n.z=p.z;}n.live=true;n.tx=p.x;n.tz=p.z;n.tr=p.r||0;n.ty=p.y||0;n.bike=p.m===1;n.boat=p.m===2;}
       else n.live=false;
     });
   };
@@ -325,7 +353,7 @@
   function selfLabel(){if(st.selfTag)st.selfTag.textContent=st.selfNick+'（我）'+(st.selfN?' 🏅'+st.selfN:'');}
   W.setSelfBadges=function(n){st.selfN=n;selfLabel();};
   W.onIsland=function(id){var o=st.byId[id];if(!o)return false;var dx=st.player.position.x-o.d.x,dz=st.player.position.z-o.d.z,r=RT*1.15;return dx*dx+dz*dz<r*r;};
-  W.getPos=function(){return {x:st.player.position.x,z:st.player.position.z,r:st.faceY,y:st.player.position.y,m:st.biking?1:0};};
+  W.getPos=function(){return {x:st.player.position.x,z:st.player.position.z,r:st.faceY,y:st.player.position.y,m:st.boat?2:(st.biking?1:0)};};
   function turn(cur,to,k){var d=to-cur;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return cur+d*Math.min(1,k);}
   function updateStu(n,dt,t){
     if(n.live){
@@ -333,9 +361,10 @@
       if(d>.04){var k=Math.min(1,dt*5);n.x+=dx*k;n.z+=dz*k;}
       n.moving=d>.35;
       n.ry=turn(n.ry,n.moving?Math.atan2(dx,dz):n.tr,dt*8);
-      n.y+=((n.ty||0)-n.y)*Math.min(1,dt*6);n.g.rotation.y=n.ry;n.g.position.set(n.x,Math.max(n.y,City.busNear(n.x,n.z)?.4:0),n.z);
+      n.y+=((n.ty||0)-n.y)*Math.min(1,dt*6);n.g.rotation.y=n.ry;n.g.position.set(n.x,n.boat?-3.25:Math.max(n.y,City.busNear(n.x,n.z)?.4:0),n.z);
       if(n.bike){if(!n.bk){n.bk=City.makeBike();st.scene.add(n.bk);}n.bk.visible=true;n.bk.position.set(n.x,0,n.z);n.bk.rotation.y=n.ry;if(n.moving)n.bk.userData.wheels.forEach(function(w){w.rotation.x+=dt*40;});}else if(n.bk)n.bk.visible=false;
-    }else{n.moving=false;n.y=0;if(n.bk)n.bk.visible=false;n.x=n.hx;n.z=n.hz;n.g.position.set(n.hx,n.o.float.position.y,n.hz);}
+      if(n.boat){if(!n.bt){n.bt=Life.makeBoat();st.scene.add(n.bt);}n.bt.visible=true;n.bt.position.set(n.x,-3.95,n.z);n.bt.rotation.y=n.ry;}else if(n.bt)n.bt.visible=false;
+    }else{n.moving=false;n.y=0;if(n.bk)n.bk.visible=false;if(n.bt)n.bt.visible=false;n.x=n.hx;n.z=n.hz;n.g.position.set(n.hx,n.o.float.position.y,n.hz);}
     if(!st.reduce&&!st.saver)n.g.userData.body.position.y=n.moving?Math.abs(Math.sin(t*12))*.2:Math.abs(Math.sin(t*2.4+n.ph))*.1;
   }
   /* 主角：登入並建立角色後，自己的角色取代小滴；沒有角色的訪客仍是小滴 */
@@ -461,7 +490,7 @@
     if(bs){st.bossPos.x=bs.x;st.bossPos.z=bs.z;st.boss.position.set(bs.x,0,bs.z);
       st.bossFace=turn(st.bossFace||0,bs.face,Math.min(1,dt*6));st.boss.rotation.y=st.bossFace;st.bossMoving=bs.moving;}
     movePlayer(dt);
-    var pyy=st.fun?st.fun.y:(st.ride?.35:(st.biking?.5:0));st.player.position.y=pyy;
+    var pyy=st.boat?-3.25:(st.fun?st.fun.y:(st.ride?.35:(st.biking?.5:0)));st.player.position.y=pyy;
     if(st.bikeObj&&st.biking){var bo=st.bikeObj;bo.position.set(st.player.position.x,0,st.player.position.z);bo.rotation.y=st.faceY;
       if(st.walking)bo.userData.wheels.forEach(function(w){w.rotation.x+=SPEED*BIKE*dt/.42;});}
     updateAct();
@@ -473,11 +502,16 @@
     if(!st.reduce&&!st.saver){
       st.islands.forEach(function(o){
         o.float.position.y=Math.sin(t*.9+o.phase)*.12;
-        o.char.userData.body.position.y=Math.abs(Math.sin(t*2.2+o.phase))*.12;
+        Life.npc(o,t,dt);
         var sp=o.lm.userData.spin;if(sp)sp.rotation.y+=dt*1.2;
+        o.lmA.tick(t,dt,Math.hypot(pp.x-o.lmx,pp.z-o.lmz));
       });
       st.boss.userData.body.position.y=st.bossMoving?Math.abs(Math.sin(t*9))*.22:Math.abs(Math.sin(t*2.6))*.15;
     }
+    Life.update(t,dt,nowS(),st.camera,pp,st.reduce||st.saver);
+    if(st.boatObj){var bo2=st.boatObj,bb=st.boat;bo2.visible=!!bb;
+      if(st.dock)st.dock.parked.visible=!bb;
+      if(bb){bo2.position.set(bb.x,-3.95+Math.sin(t*3)*.05,bb.z);bo2.rotation.y=bb.hd;bo2.rotation.z=Math.sin(t*2)*.03;bo2.userData.wake.visible=bb.sp>2;}}
     (st.stuNodes||[]).forEach(function(n){updateStu(n,dt,t);});
     // camera
     var c=st.cam;
