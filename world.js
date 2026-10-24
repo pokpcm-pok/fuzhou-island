@@ -216,7 +216,7 @@
       var g=Props.char(s.hat||'',1.0,col,s.face);g.rotation.y=ry;g.position.set(hx,0,hz);
       g.traverse(function(m){m.userData.id=id;});st.scene.add(g);
       var tag=document.createElement('button');tag.className='tag stu';tag.textContent=s.nickname+(s.badges&&s.badges.length?' 🏅'+s.badges.length:'');tag.dataset.id=id;st.labels.appendChild(tag);
-      var n={g:g,o:o,tag:tag,sid:s.sid,hx:hx,hz:hz,x:hx,z:hz,tx:hx,tz:hz,tr:ry,ry:ry,live:false,moving:false,ph:idx*.7,id:id},od=old[s.sid];
+      var n={g:g,o:o,tag:tag,sid:s.sid,nick:s.nickname,hx:hx,hz:hz,x:hx,z:hz,tx:hx,tz:hz,tr:ry,ry:ry,live:false,moving:false,ph:idx*.7,id:id},od=old[s.sid];
       if(od&&od.live){n.x=od.x;n.z=od.z;n.tx=od.tx;n.tz=od.tz;n.tr=od.tr;n.live=true;}
       st.stuNodes.push(n);
     });
@@ -231,6 +231,17 @@
       else n.live=false;
     });
   };
+  /* 走近同學：5.5 單位內冒出「打招呼」小標籤，離開到 7 單位以外才收起（避免閃爍） */
+  W.onGreet=function(fn){st.greetFn=fn;};
+  function updateGreet(){
+    var p=st.player.position,best=null,bd=1e9,cur=st.greetNode;
+    (st.stuNodes||[]).forEach(function(n){var dx=n.x-p.x,dz=n.z-p.z,d=dx*dx+dz*dz;if(d<bd){bd=d;best=n;}});
+    var lim=(cur&&best===cur)?49:30.25;
+    st.greetNode=(best&&bd<lim)?best:null;
+    var g=st.greetEl,n=st.greetNode;
+    if(g&&n&&g.dataset.sid!==n.sid){g.dataset.sid=n.sid;g.dataset.nick=n.nick;g.textContent='👋 跟 '+n.nick+' 打招呼';}
+  }
+  W.currentIsland=function(){var o=nearestIsland(st.player.position.x,st.player.position.z);if(!o)return null;var dx=st.player.position.x-o.d.x,dz=st.player.position.z-o.d.z,r=RT*1.15;return dx*dx+dz*dz<r*r?o.d.id:null;};
   function selfLabel(){if(st.selfTag)st.selfTag.textContent=st.selfNick+'（我）'+(st.selfN?' 🏅'+st.selfN:'');}
   W.setSelfBadges=function(n){st.selfN=n;selfLabel();};
   W.onIsland=function(id){var o=st.byId[id];if(!o)return false;var dx=st.player.position.x-o.d.x,dz=st.player.position.z-o.d.z,r=RT*1.15;return dx*dx+dz*dz<r*r;};
@@ -256,6 +267,7 @@
       p=Props.char(prof.hat||'',1.1,col,prof.face);var sid='s:'+st.selfSid;
       p.traverse(function(m){m.userData.id=sid;});
       st.stuIsland[sid]=prof.island_id;
+      if(!st.greetEl){var ge=document.createElement('button');ge.className='tag greet';ge.style.display='none';st.labels.appendChild(ge);st.greetEl=ge;}
       if(!st.selfTag){var tg=document.createElement('button');tg.className='tag stu me';st.labels.appendChild(tg);st.selfTag=tg;}
       st.selfNick=prof.nickname;st.selfN=(prof.badges||[]).length;selfLabel();st.selfTag.dataset.id=sid;st.selfTag.style.display='';
       var isl=st.byId[prof.island_id];if(spawn&&isl)pos.set(isl.d.x+3.2,0,isl.d.z+3.4);
@@ -324,7 +336,7 @@
     cv.addEventListener('wheel',function(e){e.preventDefault();st.cam.dist=clampD(st.cam.dist*(1+e.deltaY*.001));},{passive:false});
     window.addEventListener('keydown',function(e){if(/INPUT|TEXTAREA/.test((e.target||{}).tagName))return;var k=e.key.length===1?e.key.toLowerCase():e.key;st.keys[k]=true;if(st.path.length&&/^(w|a|s|d|Arrow.*)$/.test(k))st.path=[];});
     window.addEventListener('keyup',function(e){var k=e.key.length===1?e.key.toLowerCase():e.key;st.keys[k]=false;});
-    st.labels.addEventListener('click',function(e){var b=e.target.closest('.tag');if(b)W.select(b.dataset.id,true);});
+    st.labels.addEventListener('click',function(e){var g=e.target.closest('.tag.greet');if(g){if(st.greetFn)st.greetFn(g.dataset.sid,g.dataset.nick);return;}var b=e.target.closest('.tag');if(b)W.select(b.dataset.id,true);});
     window.addEventListener('resize',W.resize);
   }
   function clampD(d){return Math.max(12,Math.min(110,d));}
@@ -361,6 +373,7 @@
     if(st.saver){var nw=performance.now();if(nw-(st.lastR||0)<32)return;st.lastR=nw;}
     var dt=Math.min(.05,st.clock.getDelta()),t=st.clock.elapsedTime;
     movePlayer(dt);
+    if(st.selfSid&&st.greetFn)updateGreet();else st.greetNode=null;
     var pp=st.player.position;
     // animate
     st.pg.position.y=st.walking?Math.abs(Math.sin(t*12))*.25:Math.sin(t*2)*.04;
@@ -399,6 +412,7 @@
       var dx=n.x-st.cam.tgt.x,dz=n.z-st.cam.tgt.z,near=!st.over&&dx*dx+dz*dz<26*26||st.sel===n.id;
       if(!near){n.tag.style.display='none';return;}put(n.tag,n.x,(n.live?0:n.o.float.position.y)+2.5,n.z);n.tag.classList.toggle('sel',st.sel===n.id);});
     if(st.selfTag&&st.selfSid){put(st.selfTag,st.player.position.x,3.0,st.player.position.z);st.selfTag.classList.toggle('sel',st.sel==='s:'+st.selfSid);}
+    if(st.greetEl){if(st.greetNode&&st.greetFn&&st.selfSid){var gn=st.greetNode;put(st.greetEl,gn.x,(gn.live?0:gn.o.float.position.y)+4.4,gn.z);}else st.greetEl.style.display='none';}
     placeBubbles(put);
     var cb=st.byId.courses.d;put(st.bossTag,cb.x-2.6,5.4,cb.z+2.4);st.bossTag.classList.toggle('sel',st.sel==='boss');
   }

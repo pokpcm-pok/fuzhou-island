@@ -37,7 +37,64 @@
     if(S.me)World.setAvatar(Object.assign({},S.me,{sid:S.me.sid||'me'}),spawn);else World.setAvatar(null);
   }
   function url(q){return S.cfg.api+(S.cfg.api.indexOf('?')>-1?'&':'?')+q;}
-  function applyPos(j){if(j&&j.pos)World.setPresence(j.pos,j.now||Date.now());}
+  function applyPos(j){
+    if(!j||!j.pos)return;var now=j.now||Date.now();World.setPresence(j.pos,now);
+    var n=0;Object.keys(j.pos).forEach(function(k){var p=j.pos[k];if(p&&now-p.t<20000)n++;});
+    pill(n);
+  }
+  /* 在線人數 */
+  function pill(n){
+    var st=document.getElementById('stage');if(!st)return;
+    var el=document.getElementById('onlinePill');
+    if(!el){el=document.createElement('div');el.id='onlinePill';el.setAttribute('role','status');st.appendChild(el);}
+    el.style.display=n>0?'':'none';el.textContent='🟢 現在 '+n+' 位同學在線';
+  }
+  /* 小提示（打招呼成功、收到招呼） */
+  var tTimer=0;
+  function toast(text,onclick){
+    var st=document.getElementById('stage');if(!st)return;
+    var el=document.getElementById('greetToast');
+    if(!el){el=document.createElement('div');el.id='greetToast';el.setAttribute('role','status');st.appendChild(el);}
+    el.textContent=text;el.style.display='block';el.onclick=function(){el.style.display='none';if(onclick)onclick();};
+    clearTimeout(tTimer);tTimer=setTimeout(function(){el.style.display='none';},8000);
+  }
+  /* 打招呼：走近同學時點小標籤，送出一句預設問候（走既有的公開氣泡留言） */
+  function greet(sid,nick){
+    if(!S.me)return;
+    var now=Date.now();S.gt=S.gt||{};
+    if(S.gt[sid]&&now-S.gt[sid]<30000){toast('剛剛已經跟 '+nick+' 打過招呼囉，過一會兒再試 🙂');return;}
+    var me=S.me.nickname,T=['嗨！我是'+me+'，很高興認識你','嗨！一起逛逛浮洲島吧','你好～我是'+me+'，今天過得好嗎？','嗨嗨！我是'+me+'，多多指教'];
+    var text=('@'+nick+' '+T[Math.floor(Math.random()*T.length)]).slice(0,40);
+    var done=function(m){S.gt[sid]=now;addLog(m,true);toast('已經跟 '+nick+' 打招呼了 👋');};
+    if(!live()){done({id:'pv-'+now,sid:mySid(),nick:me,text:text});return;}
+    api({action:'say',token:S.token,text:text}).then(function(j){done(j.msg);})
+      .catch(function(e){if(/逾時|無效/.test(e.message)){S.token=null;toast('登入已逾時，請重新登入後再打招呼');}else toast(e.message);});
+  }
+  /* 到訪統計：記下自己停留過的島，每分鐘回報一次（只存島嶼代號與次數） */
+  function trackVisit(){
+    if(document.hidden||!S.sess||!S.me)return;
+    var id=World.currentIsland?World.currentIsland():null;
+    if(!id){S.vc=null;S.vl=null;return;}
+    if(S.vc===id&&S.vl!==id){S.vis=S.vis||{};S.vis[id]=(S.vis[id]||0)+1;S.vl=id;}
+    if(S.vc!==id){S.vc=id;}
+  }
+  function flushVisits(){
+    if(!S.sess||!S.vis||!Object.keys(S.vis).length)return;
+    var v=S.vis;S.vis={};
+    api({action:'visit',sess:S.sess,visits:v}).catch(function(){Object.keys(v).forEach(function(k){S.vis[k]=(S.vis[k]||0)+v[k];});});
+  }
+  /* 本週最熱門的島（顯示在總覽） */
+  function loadStats(){
+    if(!live()){return;}
+    fetch(url('action=stats')).then(function(r){return r.json();}).then(function(j){
+      var el=document.getElementById('hot');if(!el||!j||!Array.isArray(j.top))return;
+      var top=j.top.filter(function(t){return t.visits>0;}).slice(0,3),M=['🥇','🥈','🥉'];
+      if(!top.length){el.innerHTML='<h3>🔥 本週最熱門的島</h3><p class="note">本週還沒有統計，快去島上逛逛！</p>';return;}
+      el.innerHTML='<h3>🔥 本週最熱門的島</h3><ul class="hot">'+top.map(function(t,i){
+        var d=S.o.D.filter(function(x){return x.id===t.island_id;})[0];if(!d)return '';
+        return '<li><button class="ix" data-id="'+esc(d.id)+'" style="--t:var(--'+d.hue+'-t)"><i></i><span>'+M[i]+' '+esc(d.name)+'</span></button><span>'+t.visits+' 次到訪</span></li>';}).join('')+'</ul>';
+    }).catch(function(){});
+  }
   function syncLoop(){
     var wait=3000;
     if(!live()){return;}
@@ -217,7 +274,8 @@
     S.log.push({nick:m.nick,text:m.text});if(S.log.length>40)S.log.shift();
     if(bubble){
       if(m.boss||m.sid==='boss'){World.say('boss',m.text,'波客老師・公告',25000,'npc boss');banner(m.text);}
-      else World.say('s:'+m.sid,m.text,m.nick,9000,'stu');
+      else{World.say('s:'+m.sid,m.text,m.nick,9000,'stu');
+        if(S.me&&m.sid!==mySid()&&String(m.text).indexOf('@'+S.me.nickname+' ')===0)toast('👋 '+m.nick+' 跟你打招呼：'+String(m.text).slice(S.me.nickname.length+2),function(){World.select('s:'+m.sid,true);});}
     }
   }
   function sendChat(text){
@@ -245,6 +303,11 @@
     init:function(o){S.o=o;S.cfg=o.cfg;o.detail.addEventListener('click',onClick);
       refresh();setInterval(function(){if(!document.hidden)refresh();},90000);
       pollChat();setInterval(pollChat,8000);setTimeout(syncLoop,1500);
+      World.onGreet(greet);
+      setInterval(trackVisit,2000);setInterval(flushVisits,60000);
+      window.addEventListener('pagehide',flushVisits);
+      loadStats();setInterval(function(){if(!document.hidden)loadStats();},300000);
+      var hot=document.getElementById('hot');if(hot)hot.addEventListener('click',function(e){var b=e.target.closest('.ix');if(b)World.select(b.dataset.id,true);});
       o.detail.addEventListener('keydown',function(e){if(e.target.id==='chatIn'&&e.key==='Enter'){e.preventDefault();sendChat(e.target.value);}});},
     open:show,hasBadge:hasBadge,canSave:canSave,loginHint:loginHint,submitBadge:submitBadge,
     html:function(id){
