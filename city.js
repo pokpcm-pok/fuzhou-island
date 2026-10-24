@@ -150,6 +150,79 @@
       });
     });
   };
+
+  /* ---------- 遊樂設施：摩天輪、大怒神（時間同步，所有同學看到的角度一致） ---------- */
+  var CMY=[0x00A9E0,0xE6007E,0xFFD400,0xFFFFFF];
+  function legs(B,H,span,zs,col,w){
+    [-1,1].forEach(function(xs){var dx=xs*span,len=Math.hypot(dx,H-.2);
+      B.add(new T.BoxGeometry(w,len,w),col,dx/2,(H+.2)/2,zs,0,0,xs*Math.atan2(span,H-.2));});
+  }
+  function makeFerris(){
+    var R=4.6,H=6.6,N=10,W=2*Math.PI/.28,g=new T.Group(),B=new Baker(),i,k;
+    bx(B,9.4,.25,3.8,0x89949B,0,.12,0);
+    [-1,1].forEach(function(zs){legs(B,H,3.0,zs*1.25,0xE8EDF0,.3);});
+    B.add(new T.CylinderGeometry(.38,.38,3.2,12),0xFFD400,0,H,0,Math.PI/2,0,0);
+    bx(B,.2,2.4,.2,0xE6007E,-1.1,1.2,3.0);bx(B,.2,2.4,.2,0xE6007E,1.1,1.2,3.0);bx(B,2.6,.4,.2,0xFFD400,0,2.5,3.0);
+    g.add(B.mesh(matVC,true));
+    var wh=new T.Group();wh.position.set(0,H,0);g.add(wh);
+    var WB=new Baker();
+    [-1,1].forEach(function(zs,zi){var z=zs*.8,c=zi?0xE6007E:0x00A9E0;
+      WB.add(new T.TorusGeometry(R,.13,6,44),c,0,0,z);
+      for(k=0;k<12;k++){var a=k*Math.PI/6;WB.add(new T.BoxGeometry(R,.08,.08),0xE8EDF0,Math.cos(a)*R/2,Math.sin(a)*R/2,z,0,0,a);}
+      for(k=0;k<24;k++){var b=k*Math.PI/12;WB.add(new T.SphereGeometry(.1,6,5),0xFFF2B0,Math.cos(b)*R,Math.sin(b)*R,z);}
+    });
+    wh.add(WB.mesh(matVC,true));
+    var gons=[];
+    for(i=0;i<N;i++){var a2=i*2*Math.PI/N,gp=new T.Group();gp.position.set(Math.cos(a2)*R,Math.sin(a2)*R,0);
+      var CB=new Baker(),col=CMY[i%4];
+      bx(CB,.1,.1,1.7,0xE8EDF0,0,0,0);cy(CB,.04,.04,.9,0x6E7B85,.5,-.45,0,5);cy(CB,.04,.04,.9,0x6E7B85,-.5,-.45,0,5);
+      bx(CB,1.4,.1,1.5,col,0,-1.4,0);bx(CB,1.4,.5,.1,col,0,-1.1,-.7);bx(CB,.1,.5,1.5,col,.65,-1.1,0);bx(CB,.1,.5,1.5,col,-.65,-1.1,0);
+      bx(CB,1.6,.1,1.7,col,0,-.45,0);
+      gp.add(CB.mesh(matVC,true));wh.add(gp);gons.push(gp);}
+    var o={kind:'ferris',group:g,gate:[0,3.6],dur:W,
+      ang:function(t){return (t*.28)%(Math.PI*2);},
+      update:function(t){var a=o.ang(t);wh.rotation.z=a;gons.forEach(function(gp){gp.rotation.z=-a;});},
+      pick:function(t){var a=o.ang(t),best=0,bd=9,j;for(j=0;j<N;j++){var d=Math.abs(wrap(j*2*Math.PI/N+a+Math.PI/2));if(d<bd){bd=d;best=j;}}return best;},
+      seat:function(t,idx){var a=idx*2*Math.PI/N+o.ang(t);return {x:Math.cos(a)*R,y:H+Math.sin(a)*R-1.35,z:0};},
+      say:function(t,riding){return riding?'🎡 高空看浮洲島！':'🎡 坐摩天輪（繞一圈約 '+Math.round(W)+' 秒）';},
+      canBoard:function(){return true;}};
+    return o;
+  }
+  var SW_CYC=40,SW_LOAD=6,SW_END=30;
+  function swTheta(t){
+    var ph=((t%SW_CYC)+SW_CYC)%SW_CYC;if(ph<SW_LOAD||ph>=SW_END)return 0;
+    var u=ph-SW_LOAD,env=Math.min(1,u/6)*Math.min(1,(24-u)/5);return env*1.15*Math.sin(2*Math.PI*u/4.2);
+  }
+  function makeSwing(){
+    var H=6.8,L=5.6,g=new T.Group(),B=new Baker();
+    bx(B,11,.25,5.4,0x89949B,0,.12,0);
+    [-1,1].forEach(function(zs){legs(B,H,3.0,zs*2.3,0xC0392B,.34);});
+    B.add(new T.CylinderGeometry(.3,.3,5.4,12),0xFFD400,0,H,0,Math.PI/2,0,0);
+    bx(B,.2,2.4,.2,0xE6007E,-1.1,1.2,3.4);bx(B,.2,2.4,.2,0xE6007E,1.1,1.2,3.4);bx(B,2.6,.4,.2,0x23282D,0,2.5,3.4);
+    g.add(B.mesh(matVC,true));
+    var ship=new T.Group();ship.position.set(0,H,0);g.add(ship);
+    var SB=new Baker();
+    [-1,1].forEach(function(zs){bx(SB,.16,L,.16,0x6E7B85,0,-L/2,zs*1.35);bx(SB,6.8,.7,.16,0xC0392B,0,-L+.55,zs*1.25);});
+    bx(SB,6.2,.4,2.6,0x8A5A33,0,-L,0);
+    [-1,1].forEach(function(xs){SB.add(new T.BoxGeometry(1.6,.5,2.6),0x8A5A33,xs*3.3,-L+.4,0,0,0,xs*-.5);bx(SB,.2,.9,2.6,0xC0392B,xs*3.7,-L+.9,0);});
+    [-1.9,0,1.9].forEach(function(x){bx(SB,.8,.1,.8,0xE8EDF0,x,-L+.4,0);});
+    cy(SB,.08,.08,2.4,0x23282D,0,-L+1.5,0,6);bx(SB,1.0,.7,.06,0x23282D,.5,-L+2.4,0);bx(SB,.3,.3,.07,0xFFFFFF,.5,-L+2.4,0);
+    ship.add(SB.mesh(matVC,true));
+    var o={kind:'swing',group:g,gate:[0,4.4],dur:SW_END-SW_LOAD,
+      update:function(t){ship.rotation.z=swTheta(t);},
+      phase:function(t){return ((t%SW_CYC)+SW_CYC)%SW_CYC;},
+      canBoard:function(t){return o.phase(t)<SW_LOAD;},
+      pick:function(){return Math.floor(Math.random()*5);},
+      seat:function(t,idx){var th=swTheta(t),xs=(idx-2)*1.0,d=L-.45;return {x:xs*Math.cos(th)+d*Math.sin(th),y:H+xs*Math.sin(th)-d*Math.cos(th),z:0};},
+      say:function(t,riding){if(riding)return '🏴‍☠️ 抓緊囉！大怒神！';var ph=o.phase(t);
+        return ph<SW_LOAD?'🏴‍☠️ 坐大怒神（約 '+Math.max(1,Math.ceil(SW_LOAD-ph))+' 秒後發車）':'⏳ 大怒神運轉中・約 '+Math.ceil(SW_CYC-ph)+' 秒後可搭';}};
+    return o;
+  }
+  C.rides=[];
+  C.addRide=function(kind,d,float){
+    if(!matVC)matVC=new T.MeshLambertMaterial({vertexColors:true});
+    var o=kind==='ferris'?makeFerris():makeSwing();o.island=d;float.add(o.group);C.rides.push(o);o.update(Date.now()/1000);return o;
+  };
   C.stationAt=function(d){return {x:d.x+ST.x,z:d.z+ST.z};};
   C.stationLocal=ST;
 
@@ -165,7 +238,8 @@
     for(k=0;k<36;k++){a=k/36*Math.PI*2+.05;B.at(0,0,0,0,1);B.add(new T.BoxGeometry(.9,.02,.12),0xFFE36B,Math.cos(a)*RING,.06,Math.sin(a)*RING,0,-a-Math.PI/2,0);}
     B.reset();
     // 保留區（島嶼座標）：地標、島民、BOSS、租借站、同學站位
-    var res=[[-2.6,-1.8,3.9],[2.8,2.6,2.8],[ST.x,ST.z,3.4]];
+    var lmP=opts.lm||[-2.6,-1.8],npP=opts.npc||[2.8,2.6],res=[[lmP[0],lmP[1],3.9],[npP[0],npP[1],2.8],[ST.x,ST.z,3.4]];
+    (opts.extra||[]).forEach(function(e){res.push(e);});
     if(opts.boss)res.push([-3.4,3.4,3.4]);
     (opts.slots||[]).forEach(function(s){res.push([s[0],s[1],.95]);});
     var placed=[];
@@ -269,6 +343,7 @@
     });
   };
   C.update=function(nowS,dt){
+    C.rides.forEach(function(r){r.update(nowS);});
     C.buses.forEach(function(b){
       var R=b.route,raw=nowS+b.off,tau=((raw%R.Tc)+R.Tc)%R.Tc,st=routeAt(R,tau),p=pathAt(R,st.s,LANE);
       var want=Math.atan2(p.tx,p.tz);
