@@ -110,6 +110,17 @@
     st.hemi.color.setHex(P.hemiS);st.hemi.groundColor.setHex(P.hemiG);st.sun.intensity=P.sun;
     st.islands.forEach(function(o){var h=P.hue[o.hue];o.cTop=new T.Color(h[0]);o.cSide=new T.Color(h[1]);});
     applyFilter();
+    if(window.Sky&&Sky.on())Sky.reapply();
+  };
+  /* 太陽高度、天氣與時間：由 sky.js 呼叫 */
+  W.setSky=function(p){
+    st.skyOn=true;st.hemi.color.setHex(p.hemiS);st.hemi.groundColor.setHex(p.hemiG);
+    st.hemi.intensity=st.hemiBase=p.hemiI;st.sun.intensity=p.sunI;st.sun.color.setHex(p.lightC);
+    st.sun.position.set(p.ldir.x*80+CX,p.ldir.y*80,p.ldir.z*80+CZ);
+    st.mode=p.k>.5?'dark':'light';
+    st.islands.forEach(function(o){var l=PAL.light.hue[o.hue],d=PAL.dark.hue[o.hue];
+      o.cTop=new T.Color(l[0]).lerp(new T.Color(d[0]),p.k);o.cSide=new T.Color(l[1]).lerp(new T.Color(d[1]),p.k);});
+    Ocean.sky(p);applyFilter();
   };
   function applyFilter(){
     var gray=new T.Color(st.mode==='dark'?0x2A3C47:0xB5C2C8);
@@ -370,6 +381,7 @@
     st.ring.scale.setScalar(1+Math.sin(t*3)*.02);
     st.odt=(st.odt||0)+dt;st.fr=(st.fr||0)+1;
     if(!st.saver||st.fr%2===0){Ocean.update(st.odt,t,st.camera,st.reduce||st.saver);st.odt=0;}
+    if(st.skyOn)st.hemi.intensity=(st.hemiBase||1)+Ocean.flash()*1.4;
     st.renderer.render(st.scene,st.camera);
     placeLabels();
   }

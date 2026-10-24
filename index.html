@@ -79,6 +79,11 @@ h1 span{color:var(--accent)}
 .tag.boss.sel{background:var(--accent);color:var(--accent-fg)}
 .hud{position:absolute;top:10px;right:10px;display:flex;gap:8px}
 .hud button{border:2px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:13px;font-weight:500}
+.skybox{position:absolute;right:12px;top:52px;z-index:9;width:min(290px,calc(100% - 24px));background:var(--panel);color:var(--fg);border:2px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.skybox[hidden]{display:none}.skybox h4{margin:0 0 8px;font-size:15px}
+.skybox label{display:block;font-size:12px;font-weight:600;margin-top:8px}
+.skybox select{display:block;width:100%;margin-top:3px;padding:6px 8px;border:2px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);font:inherit;font-size:14px}
+.skyinfo{white-space:pre-line;font-size:12.5px;margin:10px 0 4px;line-height:1.55}.skynote{font-size:11px;color:var(--muted);margin:6px 0 0;line-height:1.5}
 .hint{position:absolute;left:12px;bottom:26px;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:3px 9px;pointer-events:none;max-width:calc(100% - 140px)}
 .cmyk{position:absolute;left:0;right:0;bottom:0;display:flex;height:14px;border-top:2px solid var(--line)}
 .cmyk i{flex:1}.cmyk i:nth-child(1){background:#00A9E0}.cmyk i:nth-child(2){background:#E6007E}.cmyk i:nth-child(3){background:#FFD400}.cmyk i:nth-child(4){background:#23282D}.cmyk i:nth-child(5){background:#fff}.cmyk i:nth-child(6){background:#8a9399}
@@ -185,6 +190,7 @@ h1 span{color:var(--accent)}
 <script src="props.js"></script>
 <script src="data.js"></script>
 <script src="ocean.js"></script>
+<script src="sky.js"></script>
 <script src="world.js"></script>
 <script src="talk.js"></script>
 <script src="students.js"></script>
@@ -290,6 +296,7 @@ function boot(DATA){
   if(window.Talk)Talk.set(DATA.talk);
   Students.init({D:D,detail:detail,cfg:{api:cfg.API_URL||'',clientId:cfg.GOOGLE_CLIENT_ID||''}});
   $('#bMe').addEventListener('click',function(){Students.open();});
+  if(ok&&window.Sky)Sky.init();
   applyFilter();
 }
 
